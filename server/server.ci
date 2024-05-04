@@ -1,0 +1,151 @@
+mainmodule server
+{
+    include "cproxy_cell.h";
+    readonly CProxy_Main pic_proxy;
+
+    mainchare Main
+    {
+      entry Main(CkArgMsg *);
+      entry void run_pic(uint32_t initial_particle_count, uint32_t box_count,
+                         uint32_t max_iter_, uint32_t sim_box_length_);
+      entry[reductiontarget] void updateMax(int);
+      entry[reductiontarget] void updateTotal(int);
+      entry void print_summary();
+    };
+
+    // message used to send particles
+    message ParticleDataMsg {
+        Particle particles[];
+    };
+
+    array[2D] Particles {
+      entry Particles();
+      entry Particles(uint32_t box_count_, uint32_t initial_particle_count_,
+                      uint32_t max_iter_, uint32_t sim_box_length_);
+
+      // entry void set_cell_proxy(const CProxy_Cell& cell_array_);
+      //  Step 3a: (x, v) -> (rho, J)
+      entry void deposit_properties();
+
+      entry void set_cell_proxy(const CProxy_Cell &cell_array_);
+      // Step 3b: Reduction and sync corners between neighbours
+      entry void broadcast_ghosts();
+      entry void receive_ghost(int iter, int direction, int size,
+                               double data[size]);
+      entry void process_ghost(int direction, int size, double data[size]);
+      entry void reduce_ghosts();
+
+      entry void cell_done();
+      entry void receive_particles_from_neighbour(ParticleDataMsg * msg);
+
+      entry void append_particles(ParticleDataMsg * msg);
+
+      entry void send_displaced();
+      entry void check_and_contribute();
+      entry void ResumeFromSync();
+
+      // Orchestrating loop
+      entry void run() {
+        for (iter = 1; iter <= max_iter; iter++) {
+            serial {
+            deposit_properties();
+            broadcast_ghosts();
+            }
+
+            for (imsg = 0; imsg < CORNERS - 1; imsg++) {
+            when receive_ghost[iter](int iter, int direction, int size,
+                                    double data[size]) serial {
+                process_ghost(direction, size, data);
+            }
+            }
+
+            serial {
+            reduce_ghosts(); // reduce ghosts from all cells sharing a corner
+
+            Cell *my_cell = cell_array[thisIndex].ckLocal();
+            my_cell->start();
+            }
+
+            // resume when cell has advanced particles
+            when cell_done() serial {
+                send_displaced();
+            }
+
+            // receive particles that moved into my cell
+            for (imsg = 0; imsg < NBRS; imsg++) {
+            when receive_particles_from_neighbour(ParticleDataMsg *msg) serial {
+                append_particles(msg);
+            }
+            }
+
+            // load balance every few iterations
+            if (iter % LB_FREQ == 0) {
+            serial { AtSync(); }
+            when ResumeFromSync() {}
+
+            // inform main chare of my status
+            serial { check_and_contribute(); }
+
+            }
+        }
+        };
+    };
+
+    array[2D] Cell {
+      entry Cell(int box_count_, uint32_t initial_particle_count_,
+                 uint32_t max_iter_, uint32_t sim_box_length_);
+
+      // entry void set_particles_proxy(const CProxy_Particles&
+      // particles_array_);
+      //  signal from particles to start
+      entry void start();
+
+      // (E, #B) -> Force -> Particle Movement
+      //   Step 1: EMF Interpolation
+      //   Step 2a: Particle Advance
+      entry void process_particles();
+
+      entry void broadcast_corner();
+
+      // Step 4a: EMF Advance (rho, #J) -> (E, #B)
+      entry void solve_fields();
+
+      // Step 3b: Synchronise reduced charge density of primary corner with
+      // other corners
+      entry void recv_properties(int iter, int direction, int size,
+                                 double data[size]);
+      entry void update_properties(int direction, int size, double data[size]);
+
+      entry void set_particles_proxy(CProxy_Particles particles_array_);
+      entry void ResumeFromSync();
+
+      // Orchestrating loop
+      entry void run() {
+        for (iter = 1; iter <= max_iter; iter++) {
+            // get particle details from the particles
+            when start() {
+            // let my neighbours know my field
+            serial { broadcast_corner(); }
+
+            // update reduced charge densities
+            for (imsg = 0; imsg < CORNERS - 1; imsg++) {
+                when recv_properties[iter](int iter, int direction, int size, double data[size])
+                    serial { update_properties(direction, size, data); }
+            }
+
+            // Apply forces to my particles based on fields
+            serial {
+                solve_fields();
+                process_particles();
+            }
+            }
+
+            // load balance every few iterations
+            if (iter % LB_FREQ == 0) {
+                serial { AtSync(); }
+                when ResumeFromSync() {}
+            }
+        }
+        };
+    };
+};
