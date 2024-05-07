@@ -7,10 +7,6 @@ mainmodule server
     {
       entry Main(CkArgMsg *);
       entry void run_pic(PicParams pp, uint32_t box_count, uint32_t sim_box_length);
-      entry void run_pic(uint32_t initial_particle_count, uint32_t box_count,
-                         uint32_t max_iter_, uint32_t sim_box_length_,
-                         float mass, float charge, float time_delta,
-                         uint8_t distribution, float alpha, float beta);
       entry[reductiontarget] void updateMax(int);
       entry[reductiontarget] void updateTotal(int);
       entry void print_summary();
@@ -24,11 +20,6 @@ mainmodule server
     array[2D] Particles {
       entry Particles();
       entry Particles(PicParams pp, uint32_t box_count, uint32_t sim_box_length_);
-      entry Particles(uint32_t box_count_, uint32_t initial_particle_count_,
-                      uint32_t max_iter_, uint32_t sim_box_length_, float mass,
-                      float charge, uint8_t pos_distribution, float alpha,
-                      float beta);
-
       // entry void set_cell_proxy(const CProxy_Cell& cell_array_);
       //  Step 3a: (x, v) -> (rho, J)
       entry void deposit_properties();
@@ -99,8 +90,6 @@ mainmodule server
 
     array[2D] Cell {
       entry Cell(PicParams pp, uint32_t box_count, uint32_t sim_box_length);
-      entry Cell(int box_count_, uint32_t initial_particle_count_,
-                 uint32_t max_iter_, uint32_t sim_box_length_, float time_delta_);
 
       // entry void set_particles_proxy(const CProxy_Particles&
       // particles_array_);

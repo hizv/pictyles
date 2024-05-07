@@ -235,6 +235,7 @@ public:
     p | box_width;
     p | max_iter;
     p | initial_particle_count;
+    p | cell_array;
     PUP::PUParray<ipair>(p, neighbours, NBRS);
     PUP::PUParray<double>(p, ghost_data, NBRS * NUM_GHOSTS);
   }

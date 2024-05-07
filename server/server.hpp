@@ -58,9 +58,7 @@ public:
                              init_particle_count, iterations, time_delta);
     pp.alpha = alpha; pp.beta = beta;
 
-    create_pic(sim_box_ndims, sim_box_dims, odf, init_particle_count,
-               iterations, mass, charge, time_delta, position_distribution,
-               alpha, beta);
+    create_pic(sim_box_ndims, sim_box_dims, pp);
     uint8_t ret = 1;
     CcsSendReply(1, (void *)&ret);
   }
@@ -107,42 +105,6 @@ public:
       num_chare_z = cbrt(total_chares); // std::min(odf, dims[1]);
     }
 
-    // pic_proxy.run_pic(pp, num_chare_x, sim_box_length);
-  }
-
-  static void create_pic(uint32_t ndims, uint32_t *dims, uint32_t odf,
-                         uint32_t initial_particle_count,
-                         uint32_t max_iterations, float mass, float charge,
-                         float time_delta, uint8_t distribution, float alpha,
-                         float beta) {
-    uint32_t num_chare_x, num_chare_y, num_chare_z;
-
-    uint32_t sim_box_length = dims[0];
-    num_chare_x = num_chare_y = num_chare_z = 1;
-
-    uint32_t total_chares = odf * CkNumPes();
-
-    if (ndims == 1)
-      num_chare_x = total_chares; // std::min(odf, dims[0]);
-    if (ndims == 2) {
-      num_chare_x = sqrt(total_chares); // std::min(odf, dims[0]);
-      num_chare_y = sqrt(total_chares); // std::min(odf, dims[1]);
-    }
-    if (ndims == 3) {
-      num_chare_x = cbrt(total_chares); // std::min(odf, dims[0]);
-      num_chare_y = cbrt(total_chares); // std::min(odf, dims[1]);
-      num_chare_z = cbrt(total_chares); // std::min(odf, dims[1]);
-    }
-
-#ifndef NDEBUG
-    CkPrintf("Creating PiC of size (%u, %u, %u), max_iter=%u, sim_box=%ux%u\n",
-             num_chare_x, num_chare_y, num_chare_z, max_iterations,
-             sim_box_length, sim_box_length);
-#endif
-
-    pic_proxy.run_pic(initial_particle_count, num_chare_x, max_iterations,
-                      sim_box_length, mass, charge, time_delta, distribution, alpha, beta);
+    pic_proxy.run_pic(pp, num_chare_x, sim_box_length);
   }
 };
-
-
