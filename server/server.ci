@@ -6,8 +6,11 @@ mainmodule server
     mainchare Main
     {
       entry Main(CkArgMsg *);
+      entry void run_pic(PicParams pp, uint32_t box_count, uint32_t sim_box_length);
       entry void run_pic(uint32_t initial_particle_count, uint32_t box_count,
-                         uint32_t max_iter_, uint32_t sim_box_length_);
+                         uint32_t max_iter_, uint32_t sim_box_length_,
+                         float mass, float charge, float time_delta,
+                         uint8_t distribution, float alpha, float beta);
       entry[reductiontarget] void updateMax(int);
       entry[reductiontarget] void updateTotal(int);
       entry void print_summary();
@@ -20,8 +23,11 @@ mainmodule server
 
     array[2D] Particles {
       entry Particles();
+      entry Particles(PicParams pp, uint32_t box_count, uint32_t sim_box_length_);
       entry Particles(uint32_t box_count_, uint32_t initial_particle_count_,
-                      uint32_t max_iter_, uint32_t sim_box_length_);
+                      uint32_t max_iter_, uint32_t sim_box_length_, float mass,
+                      float charge, uint8_t pos_distribution, float alpha,
+                      float beta);
 
       // entry void set_cell_proxy(const CProxy_Cell& cell_array_);
       //  Step 3a: (x, v) -> (rho, J)
@@ -92,22 +98,28 @@ mainmodule server
     };
 
     array[2D] Cell {
+      entry Cell(PicParams pp, uint32_t box_count, uint32_t sim_box_length);
       entry Cell(int box_count_, uint32_t initial_particle_count_,
-                 uint32_t max_iter_, uint32_t sim_box_length_);
+                 uint32_t max_iter_, uint32_t sim_box_length_, float time_delta_);
 
       // entry void set_particles_proxy(const CProxy_Particles&
       // particles_array_);
       //  signal from particles to start
       entry void start();
 
-      // (E, #B) -> Force -> Particle Movement
+      // (E, B) -> Force -> Particle Movement
       //   Step 1: EMF Interpolation
       //   Step 2a: Particle Advance
       entry void process_particles();
 
       entry void broadcast_corner();
 
-      // Step 4a: EMF Advance (rho, #J) -> (E, #B)
+      // exchanges for finite difference calculation
+      entry void share_fields();
+      entry void recv_vec3(int iter, int direction, int count, double data[3*count]);
+      entry void update_field_ghosts(int direction, int count, double data[3*count]);
+
+      // Step 4a: EMF Advance (J) -> (E, B)
       entry void solve_fields();
 
       // Step 3b: Synchronise reduced charge density of primary corner with
@@ -124,20 +136,29 @@ mainmodule server
         for (iter = 1; iter <= max_iter; iter++) {
             // get particle details from the particles
             when start() {
-            // let my neighbours know my field
-            serial { broadcast_corner(); }
+              // share reduced properties to cells which share that corner
+              serial { broadcast_corner(); }
 
-            // update reduced charge densities
-            for (imsg = 0; imsg < CORNERS - 1; imsg++) {
-                when recv_properties[iter](int iter, int direction, int size, double data[size])
-                    serial { update_properties(direction, size, data); }
-            }
+              // update reduced charge densities
+              for (imsg = 0; imsg < CORNERS - 1; imsg++) {
+                  when recv_properties[iter](int iter, int direction, int size, double data[size])
+                      serial { update_properties(direction, size, data); }
+              }
+
+              // exchange necessary fields for finding finite differences wrt space
+              serial { share_fields(); }
+
+              // store fields required for finding differences
+              for (imsg = 0; imsg < CORNERS; imsg++) {
+                when recv_vec3[iter](int iter, int direction, int count, double data[3*count])
+                  serial { update_field_ghosts(direction, count, data); }
+              }
 
             // Apply forces to my particles based on fields
-            serial {
-                solve_fields();
-                process_particles();
-            }
+              serial {
+                  solve_fields();
+                  process_particles();
+              }
             }
 
             // load balance every few iterations

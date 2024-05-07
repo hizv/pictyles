@@ -37,22 +37,50 @@
   _DATA[2] = my_cell->current_densities[_INDEX].y; \
   _DATA[3] = my_cell->current_densities[_INDEX].z;
 
-#define ARR_TO_VEC(_DATA, _DIR)                                                \
-  vec3(_DATA[GHOST_IDX(_DIR, 1)], _DATA[GHOST_IDX(_DIR, 2)],                   \
-       _DATA[GHOST_IDX(_DIR, 3)])
+#define GHOSTARR_TO_VEC(_DATA, _DIR, _OFFSET)                                                \
+  vec3(_DATA[GHOST_IDX(_DIR, 3*_OFFSET)], _DATA[GHOST_IDX(_DIR, 3*_OFFSET+1)],                   \
+       _DATA[GHOST_IDX(_DIR, 3*_OFFSET+2)])
+
+#define pack_vec3(_DATA, _OFFSET)                                              \
+  vec3(_DATA[_OFFSET], _DATA[_OFFSET + 1], _DATA[_OFFSET + 2])
+
+#define unpack_vec3(_v) _v.x, _v.y, _v.z
+#define vec3_pair_to_list(_DATA, _TYPE, _i, _j)                                       \
+  { unpack_vec3(_DATA[_i]._TYPE), unpack_vec3(_DATA[_j]._TYPE) }
 
 typedef std::pair<int, int> ipair;
 
-enum directions {
-  LEFT = 1,
-  RIGHT = 2,
-  UP = 4,
-  DOWN = 8
+// i: x-axis, j: y-axis, k: z-axis
+enum directions2D {
+  LEFT = 1, // i - 1
+  RIGHT = 2, // i + 1
+  UP = 4, // j + 1
+  DOWN = 8 // j - 1
+};
+
+enum directions3D {
+  // LEFT: i - 1
+  // RIGHT: i + 1
+  // UP: k + 1
+  // DOWN: k - 1
+  BACK = 16, // j + 1
+  FRONT = 32 // j - 1
 };
 
 enum properties {
   CHARGE_DENSITY = 1,
   CURRENT_DENSITY = 2
+};
+
+enum distribution {
+  LINEAR,
+  SINE,
+  GEOMETRIC
+};
+
+enum geometry {
+  CART2D,
+  CART3D
 };
 
 /*********************************************************************************************
@@ -74,14 +102,17 @@ struct vec3 {
   inline vec3 operator+(const vec3 &rhs) {
     return vec3(x + rhs.x, y + rhs.y, z + rhs.z);
   }
+
   inline vec3 &operator-=(const vec3 &rhs) { return *this += (rhs * -1.0); }
 
   inline vec3 operator*(const double d) const {
     return vec3(d * x, d * y, d * z);
   }
+
   inline vec3 operator/(const double d) const {
     return vec3(x/d, y/d, z/d);
   }
+
   inline vec3 operator-(const vec3 &rhs) const {
     return vec3(x - rhs.x, y - rhs.y, z - rhs.z);
   }
@@ -192,3 +223,19 @@ struct Field {
   virtual ~Field(){};
 };
 
+struct PicParams {
+  uint8_t pos_distribution, geometry;
+  uint32_t odf, initial_particle_count, max_iterations;
+  float mass, charge, time_delta, alpha, beta;
+  PicParams() {}
+  PicParams(uint8_t pos_distribution_, uint8_t geometry_, uint32_t odf_,
+            uint32_t initial_particle_count_, uint32_t max_iterations_,
+            float time_delta_)
+      : pos_distribution(pos_distribution_), geometry(geometry_), odf(odf_),
+        initial_particle_count(initial_particle_count_),
+        max_iterations(max_iterations_), time_delta(time_delta_) {
+    alpha = 0.0;
+    beta = 0.0;
+  }
+};
+PUPbytes(PicParams)
