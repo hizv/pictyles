@@ -1,0 +1,9 @@
+charmrun
+*.decl.h
+*.def.h
+*.o
+*.out
+*.log.gz
+*.projrc
+*.sts
+__pycache__/
