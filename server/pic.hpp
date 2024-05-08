@@ -58,23 +58,7 @@ public:
     E_jprev = new vec3[CORNERS];
   }
 
-  Cell(int box_count_, uint32_t initial_particle_count_, uint32_t max_iter_,
-       uint32_t sim_box_length_, float time_delta_)
-      : iter(0), initial_particle_count(initial_particle_count_),
-        max_iter(max_iter_), box_count(box_count_),
-        sim_box_length(sim_box_length_) {
-    usesAtSync = true;
-
-    float box_width = sim_box_length / (float)box_count;
-    solver = Solver(box_width, time_delta_);
-
-    B_inext = new vec3[CORNERS];
-    B_jnext = new vec3[CORNERS];
-    E_iprev = new vec3[CORNERS];
-    E_jprev = new vec3[CORNERS];
-  }
-
-  void set_particles_proxy(CProxy_Particles particles_array_) {
+    void set_particles_proxy(CProxy_Particles particles_array_) {
     particles_array = particles_array_;
   }
 
@@ -291,90 +275,12 @@ public:
       double cos_theta = rel_x / std::sqrt(r1_sq);
       double cos_phi = (1.0 - rel_x) / std::sqrt(r2_sq);
 
-      double base_charge = 1e4 * pp.charge * UNIT_CHARGE /
+      double base_charge = pp.charge * UNIT_CHARGE /
                            (DT * DT * (cos_theta / r1_sq + cos_phi / r2_sq));
       double particle_charge =
           (thisIndex.x % 2 == 0) ? base_charge : -1.0 * base_charge;
       particles.push_back(
           Particle(pos_x, pos_y, particle_charge, pp.mass * UNIT_MASS));
-    }
-
-    for (int i = -1; i <= 1; i++) {
-      for (int j = -1; j <= 1; j++) {
-        if (i == 0 && j == 0)
-          continue; // (0, 0) is chare itself
-        int idx = 3 * (j + 1) + (i + 1);
-        if (idx == 8)
-          idx = 4; // map (1, 1) to (0, 0) to fit in array
-
-        neighbours[idx] = {MODZ(thisIndex.x + i, box_count),
-                           MODZ(thisIndex.y + j, box_count)};
-
-        // CkPrintf("%d, %d -> %d, %d\n", thisIndex.x, thisIndex.y,
-        // neighbours[idx].first, neighbours[idx].second);
-      }
-    }
-
-    // thisProxy(thisIndex.x, thisIndex.y).run();
-  }
-
-
-  Particles(uint32_t box_count_, uint32_t initial_particle_count_,
-            uint32_t max_iter_, uint32_t sim_box_length_, float charge,
-            float mass, uint8_t pos_distribution, float alpha, float beta)
-      : iter(0), initial_particle_count(initial_particle_count_),
-        max_iter(max_iter_), box_count(box_count_) {
-    usesAtSync = true;
-    std::random_device rd;
-    std::mt19937 e2(rd());
-
-    box_width = sim_box_length_ / (float)box_count;
-
-    // initialise random generators for coordinates
-    double low_x = thisIndex.x * box_width;
-    double high_x = low_x + box_width;
-
-    double low_y = thisIndex.y * box_width;
-    double high_y = low_y + box_width;
-
-    std::uniform_real_distribution<double> dist_x(low_x, high_x);
-    std::uniform_real_distribution<double> dist_y(low_y, high_y);
-
-    particles = std::vector<Particle>(0);
-
-    int particle_count;
-    switch (pos_distribution) {
-    case LINEAR:
-      particle_count = linear_init2D(initial_particle_count, box_count,
-                                     thisIndex.x, 1, 2);
-      break;
-    case SINE:
-      particle_count = sinusoidal_init2D(initial_particle_count, box_count,
-                                     thisIndex.x);
-      break;
-    case GEOMETRIC:
-      particle_count = geometric_init2D(initial_particle_count, box_count,
-                                     thisIndex.x, alpha);
-      break;
-    }
-
-    for (int i = 0; i < particle_count; i++) {
-      double pos_x = dist_x(e2);
-      double pos_y = dist_y(e2);
-      double rel_x = std::fmod(pos_x, 1.0);
-      double rel_y = std::fmod(pos_y, 1.0);
-
-      double r1_sq = rel_y * rel_y + rel_x * rel_x;
-      double r2_sq = rel_y * rel_y + (1.0 - rel_x) * (1.0 - rel_x);
-      double cos_theta = rel_x / std::sqrt(r1_sq);
-      double cos_phi = (1.0 - rel_x) / std::sqrt(r2_sq);
-
-      double base_charge = 1e4 * charge * UNIT_CHARGE /
-                           (DT * DT * (cos_theta / r1_sq + cos_phi / r2_sq));
-      double particle_charge =
-          (thisIndex.x % 2 == 0) ? base_charge : -1.0 * base_charge;
-      particles.push_back(
-          Particle(pos_x, pos_y, particle_charge, mass * UNIT_MASS));
     }
 
     for (int i = -1; i <= 1; i++) {

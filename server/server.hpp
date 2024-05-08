@@ -56,6 +56,8 @@ public:
 
     PicParams pp = PicParams(position_distribution, geometry, odf,
                              init_particle_count, iterations, time_delta);
+
+    pp.mass = mass; pp.charge = charge;
     pp.alpha = alpha; pp.beta = beta;
 
     create_pic(sim_box_ndims, sim_box_dims, pp);
