@@ -1,6 +1,6 @@
 CHARMDIR=~/bin/charm
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
-OPTS=-O3
+OPTS=-O3 -module CommonLBs
 #-tracemode projections -lz #-DNDEBUG
 
 all: server.out

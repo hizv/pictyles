@@ -37,6 +37,11 @@ struct Solver {
 
       field->electric_field.x +=
           -dt * J.x + dt_ov_dy * (B_jnext.z - B_cur.z);
+      if (std::isnan(field->electric_field.x)) {
+          CkPrintf("[maxwell_solver2D] E.x is NaN: dt=%lf, J.x=%lf, dt_ov_dy=%lf, B_jnext.z=%lf, B_cur.z=%lf\n", dt, J.x, dt_ov_dy, B_jnext.z, B_cur.z);
+      }
+
+
       field->electric_field.y +=
           -dt * J.y - dt_ov_dx * (B_inext.z - B_cur.z);
       field->electric_field.z += -dt * J.z +

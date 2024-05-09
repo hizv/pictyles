@@ -108,6 +108,11 @@ inline Field interpolated_field2D(double grid_size, const vec3& position,
                         + field[3].electric_field * w11;
   field_at_point.electric_field = efield_at_point;
 
+  if (std::isnan(field_at_point.electric_field.x)) {
+      CkPrintf("[interpolated_field2D] E.x is NaN!\n");
+  }
+
+
   // Interpolate magnetic field
   vec3 bfield_at_point = field[0].magnetic_field * w00
                         + field[1].magnetic_field * w01
@@ -115,13 +120,18 @@ inline Field interpolated_field2D(double grid_size, const vec3& position,
                         + field[3].magnetic_field * w11;
   field_at_point.magnetic_field = bfield_at_point;
 
+  if (std::isnan(field_at_point.magnetic_field.x)) {
+      CkPrintf("[interpolated_field2D] B.x is NaN!\n");
+  }
+
+
   return field_at_point;
 }
 
 // calculate force using electric and magnetic fields
 inline vec3 field_to_force(const Field& field, const Particle& p) {
   vec3 force;
-  force = field.electric_field * p.charge * 1e5; // F_E = qE
+  force = field.electric_field * p.charge; // F_E = qE
 
 
   // F_B = q (v cross B)
@@ -130,6 +140,10 @@ inline vec3 field_to_force(const Field& field, const Particle& p) {
                             field.magnetic_field.z * v.x - field.magnetic_field.x * v.z,
                             field.magnetic_field.x * v.y - field.magnetic_field.y * v.x };
   force += cross_product * p.charge;
+
+  if (std::isnan(force.x)) {
+      CkPrintf("[field_to_force] Force.x is NaN!, charge: %lf\n", p.charge * 1e12);
+  }
   return force;
 }
 #endif // INTERPOLATE_H_

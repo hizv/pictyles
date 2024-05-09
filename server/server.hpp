@@ -51,8 +51,8 @@ public:
     float mass = extract<float>(cmd);
     float charge = extract<float>(cmd);
 
-    CkPrintf("<create_handler> %u %u %f %u\n", sim_box_ndims, odf, time_delta,
-             init_particle_count);
+    CkPrintf("<create_handler> %u %u %f %u mass=%E\n", sim_box_ndims, odf, time_delta,
+             init_particle_count, mass);
 
     PicParams pp = PicParams(position_distribution, geometry, odf,
                              init_particle_count, iterations, time_delta);

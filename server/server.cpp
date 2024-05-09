@@ -29,7 +29,7 @@ public:
              box_count * box_count);
 
     // Create array of particles.
-    CkArrayOptions opts(box_count, box_count);
+    CkArrayOptions opts(box_count, box_count, 1);
 
     CProxy_Particles particles_array =
         CProxy_Particles::ckNew(pp, box_count, sim_box_length, opts);

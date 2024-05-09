@@ -14,7 +14,7 @@ electron = Species(name="electron", init_count=100000,
 sim = Simulation(
     interface=interface,
     odf=16,
-    sim_box_shape=[100, 100],
+    sim_box_shape=[5, 5],
     iterations=100000,
     boundary_conditions="periodic",
     species=[electron],

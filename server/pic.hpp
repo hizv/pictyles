@@ -1,8 +1,8 @@
 #include "defs.h"
+#include "initialise.hpp"
 #include "interpolate.hpp"
 #include "server.decl.h"
 #include "solver.hpp"
-#include "initialise.hpp"
 
 #include "pup_stl.h"
 #include <cmath>
@@ -44,7 +44,7 @@ public:
   Cell(CkMigrateMessage *m) {}
 
   Cell(PicParams pp, uint32_t box_count, uint32_t sim_box_length)
-       : iter(0), initial_particle_count(pp.initial_particle_count),
+      : iter(0), initial_particle_count(pp.initial_particle_count),
         max_iter(pp.max_iterations), box_count(box_count),
         sim_box_length(sim_box_length) {
     usesAtSync = true;
@@ -58,7 +58,7 @@ public:
     E_jprev = new vec3[CORNERS];
   }
 
-    void set_particles_proxy(CProxy_Particles particles_array_) {
+  void set_particles_proxy(CProxy_Particles particles_array_) {
     particles_array = particles_array_;
   }
 
@@ -74,6 +74,13 @@ public:
     PUP::PUParray<Field>(p, fields, CORNERS);
     PUP::PUParray<double>(p, charge_densities, CORNERS);
     PUP::PUParray<vec3>(p, current_densities, CORNERS);
+
+    if (p.isUnpacking()) {
+      B_inext = new vec3[CORNERS];
+      B_jnext = new vec3[CORNERS];
+      E_iprev = new vec3[CORNERS];
+      E_jprev = new vec3[CORNERS];
+    }
   }
 
   void process_particles();
@@ -84,12 +91,15 @@ public:
     data[1] = current_densities[1].x;
     data[2] = current_densities[1].y;
     data[3] = current_densities[1].z;
-    thisProxy(MODZ(thisIndex.x - 1, box_count), thisIndex.y)
+
+    // CkPrintf("broadcast_corner[%d, (%d, %d, %d)]: J = %E, %E, %E\n", iter,
+    // thisIndex.x, thisIndex.y, thisIndex.z, data[1], data[2], data[3]);
+    thisProxy(MODZ(thisIndex.x - 1, box_count), thisIndex.y, thisIndex.z)
         .recv_properties(iter, RIGHT, NUM_GHOSTS, data);
-    thisProxy(thisIndex.x, MODZ(thisIndex.y + 1, box_count))
+    thisProxy(thisIndex.x, MODZ(thisIndex.y + 1, box_count), thisIndex.z)
         .recv_properties(iter, DOWN, NUM_GHOSTS, data);
     thisProxy(MODZ(thisIndex.x - 1, box_count),
-              MODZ(thisIndex.y + 1, box_count))
+              MODZ(thisIndex.y + 1, box_count), thisIndex.z)
         .recv_properties(iter, DOWN & RIGHT, NUM_GHOSTS, data);
   }
 
@@ -97,6 +107,9 @@ public:
     switch (size) {
     case 4: {
       vec3 curr_density = vec3(data[1], data[2], data[3]);
+
+      // CkPrintf("update_properties[%d, (%d, %d, %d)]: J = %E, %E, %E\n", iter,
+      // thisIndex.x, thisIndex.y, thisIndex.z, data[1], data[2], data[3]);
       switch (direction) {
       case DOWN:
         current_densities[0] = curr_density;
@@ -135,14 +148,11 @@ public:
     double E_iprev[6] = vec3_pair_to_list(fields, electric_field, 0, 1);
     double E_jprev[6] = vec3_pair_to_list(fields, electric_field, 0, 2);
 
-    thisProxy(MODZ(thisIndex.x - 1, box_count), thisIndex.y)
-        .recv_vec3(iter, RIGHT, 2, B_inext);
-    thisProxy(thisIndex.x, MODZ(thisIndex.y - 1, box_count))
-        .recv_vec3(iter, UP, 2, B_jnext);
-    thisProxy(MODZ(thisIndex.x + 1, box_count), thisIndex.y)
-        .recv_vec3(iter, LEFT, 2, E_iprev);
-    thisProxy(thisIndex.x, MODZ(thisIndex.y + 1, box_count))
-        .recv_vec3(iter, DOWN, 2, E_jprev);
+    int i = thisIndex.x, j = thisIndex.y, k = thisIndex.z;
+    thisProxy(MODZ(i - 1, box_count), j, k).recv_vec3(iter, RIGHT, 2, B_inext);
+    thisProxy(i, MODZ(j - 1, box_count), k).recv_vec3(iter, UP, 2, B_jnext);
+    thisProxy(MODZ(i + 1, box_count), j, k).recv_vec3(iter, LEFT, 2, E_iprev);
+    thisProxy(i, MODZ(j + 1, box_count), k).recv_vec3(iter, DOWN, 2, E_jprev);
   }
 
   void update_field_ghosts(int direction, int count, double *data) {
@@ -190,9 +200,12 @@ public:
       E_jprev[1] = fields[0].electric_field;
       E_jprev[3] = fields[2].electric_field;
 
-      for (int i = 0; i < CORNERS; i++)
+      for (int i = 0; i < CORNERS; i++) {
+        // CkPrintf("[%d] J = %E, %E, %E\n", iter, current_densities[i].x,
+        // current_densities[i].y, current_densities[i].z);
         solver.maxwell_solver2D(current_densities[i], &fields[i], B_inext[i],
                                 B_jnext[i], E_iprev[i], E_jprev[i]);
+      }
     }
   }
 };
@@ -205,23 +218,23 @@ class Particles : public CBase_Particles {
   int iter, imsg, box_count;
   uint32_t initial_particle_count, max_iter;
   float box_width;
-  ipair neighbours[NBRS];
+  // idx3 neighbours[NBRS];
   double ghost_data[NBRS * NUM_GHOSTS];
 
 public:
   std::vector<Particle> particles;
 
   void pup(PUP::er &p) {
-    p | particles;
+    p | cell_array;
     p | iter;
     p | imsg;
     p | box_count;
-    p | box_width;
-    p | max_iter;
     p | initial_particle_count;
-    p | cell_array;
-    PUP::PUParray<ipair>(p, neighbours, NBRS);
+    p | max_iter;
+    p | box_width;
+    // PUP::PUParray<idx3>(p, neighbours, NBRS);
     PUP::PUParray<double>(p, ghost_data, NBRS * NUM_GHOSTS);
+    p | particles;
   }
 
   Particles(CkMigrateMessage *m) {}
@@ -255,12 +268,12 @@ public:
                                      thisIndex.x, pp.alpha, pp.beta);
       break;
     case SINE:
-      particle_count = sinusoidal_init2D(initial_particle_count, box_count,
-                                     thisIndex.x);
+      particle_count =
+          sinusoidal_init2D(initial_particle_count, box_count, thisIndex.x);
       break;
     case GEOMETRIC:
       particle_count = geometric_init2D(initial_particle_count, box_count,
-                                     thisIndex.x, pp.alpha);
+                                        thisIndex.x, pp.alpha);
       break;
     }
 
@@ -283,22 +296,6 @@ public:
           Particle(pos_x, pos_y, particle_charge, pp.mass * UNIT_MASS));
     }
 
-    for (int i = -1; i <= 1; i++) {
-      for (int j = -1; j <= 1; j++) {
-        if (i == 0 && j == 0)
-          continue; // (0, 0) is chare itself
-        int idx = 3 * (j + 1) + (i + 1);
-        if (idx == 8)
-          idx = 4; // map (1, 1) to (0, 0) to fit in array
-
-        neighbours[idx] = {MODZ(thisIndex.x + i, box_count),
-                           MODZ(thisIndex.y + j, box_count)};
-
-        // CkPrintf("%d, %d -> %d, %d\n", thisIndex.x, thisIndex.y,
-        // neighbours[idx].first, neighbours[idx].second);
-      }
-    }
-
     // thisProxy(thisIndex.x, thisIndex.y).run();
   }
 
@@ -318,8 +315,8 @@ public:
                         my_cell->charge_densities);
 
       // Compute current density and deposit
-      vec3 current_density = p.position * dot(p.velocity, p.velocity) *
-                             p.charge / dot(p.position, p.position);
+
+      vec3 current_density = p.velocity * p.charge;
       deposit_density2Dvec(box_width, p.position, current_density,
                            my_cell->current_densities);
     }
@@ -327,21 +324,21 @@ public:
   }
 
   void broadcast_ghosts() {
-    int i = thisIndex.x, j = thisIndex.y;
+    int i = thisIndex.x, j = thisIndex.y, k = thisIndex.z;
     Cell *my_cell = cell_array[thisIndex].ckLocal();
 
     double *data = new double[NUM_GHOSTS];
     // send my corners
     PACK_GHOST(data, 3)
-    thisProxy(MODZ(i + 1, box_count), j)
+    thisProxy(MODZ(i + 1, box_count), j, k)
         .receive_ghost(iter, LEFT, NUM_GHOSTS, data);
 
     PACK_GHOST(data, 0)
-    thisProxy(i, MODZ(j - 1, box_count))
+    thisProxy(i, MODZ(j - 1, box_count), k)
         .receive_ghost(iter, UP, NUM_GHOSTS, data);
 
     PACK_GHOST(data, 2)
-    thisProxy(MODZ(i + 1, box_count), MODZ(j - 1, box_count))
+    thisProxy(MODZ(i + 1, box_count), MODZ(j - 1, box_count), k)
         .receive_ghost(iter, UP & LEFT, NUM_GHOSTS, data);
   }
 
@@ -359,17 +356,21 @@ public:
     my_cell->current_densities[1] += GHOSTARR_TO_VEC(ghost_data, LEFT, 1) +
                                      GHOSTARR_TO_VEC(ghost_data, UP & LEFT, 1) +
                                      GHOSTARR_TO_VEC(ghost_data, UP, 1);
+    // CkPrintf("reduce_ghosts[%d, (%d, %d, %d)]: J = %E, %E, %E\n", iter,
+    // thisIndex.x, thisIndex.y, thisIndex.z, my_cell->current_densities[1].x,
+    // my_cell->current_densities[1].y, my_cell->current_densities[1].z);
   }
 
   // add out of chare particles to the message buffer for the
   // destination chare
   void send_displaced() {
-    std::map<ipair, std::vector<Particle>> bufs;
-
+    // std::unordered_map<idx3, std::vector<Particle>> bufs;
+    std::vector<std::vector<Particle>> bufs(27);
     int i = 0;
     while (i < particles.size()) {
       int dest_chare_x = particles[i].position.x / (double)box_width;
       int dest_chare_y = particles[i].position.y / (double)box_width;
+      int dest_chare_z = particles[i].position.z / (double)box_width;
 
       // If just touching the edge, then floating point precision rounds up to
       // the right boundary
@@ -385,19 +386,27 @@ public:
       if (dest_chare_x == thisIndex.x && dest_chare_y == thisIndex.y) {
         i++; // Stay in same chare
       } else {
-        // buffer the particle in the destination neighbour's vectors
-        ipair dest = {dest_chare_x, dest_chare_y};
-        bool flag = true;
-        for (ipair &nb : neighbours) {
-          if (dest == nb)
-            flag = false;
+        int disp_x = dest_chare_x - thisIndex.x,
+            disp_y = dest_chare_y - thisIndex.y,
+            disp_z = dest_chare_z - thisIndex.z;
+
+        // if periodic, borders are 1 unit apart
+        apply_periodicity(disp_x, box_count);
+        apply_periodicity(disp_y, box_count);
+        apply_periodicity(disp_z, box_count);
+
+        // only migrate to immediate neighbours
+        if (std::abs(disp_x) > 1 || std::abs(disp_y) > 1 ||
+            std::abs(disp_z) > 1) {
+          CkPrintf("[iter=%d] Out of bounds error: %lf, %lf, %lf: box_width=%f\n", iter,
+                   particles[i].position.x, particles[i].position.y,
+                   particles[i].position.z, box_width);
+          CkPrintf("[iter=%d] Out of bounds error: %d, %d, %d: [%d, %d, %d -> %d, %d, %d]\n",
+                   iter, disp_x, disp_y, disp_z, thisIndex.x, thisIndex.y,
+                   thisIndex.z, dest_chare_x, dest_chare_y, dest_chare_z);
+          CkExit()
         }
-        if (flag)
-          CkPrintf("Error: Dest out of Locality: PIC(%d, %d) Coord: (%lf, "
-                   "%lf), From: PIC(%d, %d). Try limiting velocity.\n",
-                   dest.first, dest.second, particles[i].position.x,
-                   particles[i].position.y, thisIndex.x, thisIndex.y);
-        bufs[dest].push_back(particles[i]);
+        bufs[IDX3_HASH(disp_x, disp_y, disp_z)].push_back(particles[i]);
 
         particles[i] = particles.back();
         particles.pop_back();
@@ -405,14 +414,25 @@ public:
     }
 
     // send the messages
-    for (ipair &nb : neighbours) {
-      int len = bufs[nb].size();
+    for (int ni = 0; ni < bufs.size(); ni++) {
+      int off_x = ni / 9 - 1, off_y = (ni % 9) / 3 - 1, off_z = (ni % 3) - 1;
+      if (off_z != 0)
+        continue;
+      if (off_x == 0 && off_y == 0)
+        continue;
+      // CkPrintf("%d = hash(%d, %d, %d)\n", ni, off_x, off_y, off_z);
+      int len = bufs[ni].size();
       ParticleDataMsg *msg = new (len) ParticleDataMsg(len);
 
-      for (int i = 0; i < len; ++i)
-        msg->particles[i] = bufs[nb][i];
+      for (int pi = 0; pi < len; ++pi)
+        msg->particles[pi] = bufs[ni][pi];
 
-      thisProxy(nb.first, nb.second).receive_particles_from_neighbour(msg);
+      // CkPrintf("(%d, %d, %d) -> %d, %d, %d\n", thisIndex.x, thisIndex.y,
+      // thisIndex.z, MODZ(thisIndex.x + off_x, box_count), MODZ(thisIndex.y +
+      // off_y, box_count), thisIndex.z + off_z);
+      thisProxy(MODZ(thisIndex.x + off_x, box_count),
+                MODZ(thisIndex.y + off_y, box_count), thisIndex.z + off_z)
+          .receive_particles_from_neighbour(msg);
     }
   }
 
@@ -446,8 +466,29 @@ void Cell::process_particles() {
   for (int i = 0; i < particle_count; i++) {
     Field field =
         interpolated_field2D(box_width, particles->at(i).position, fields);
+    vec3 ff = field_to_force(field, particles->at(i));
+
+    if (std::isnan(ff.x))
+      CkPrintf("[iter=%d] force: OOB(%d, %d, %d): pos=%lf, %lf, %lf\n", iter,
+               thisIndex.x, thisIndex.y, thisIndex.z,
+               particles->at(i).position.x, particles->at(i).position.y,
+               particles->at(i).position.z);
+    if (std::isnan(particles->at(i).position.x))
+      CkPrintf(
+          "[iter=%d] Before apply force: OOB(%d, %d, %d): pos=%lf, %lf, %lf\n",
+          iter, thisIndex.x, thisIndex.y, thisIndex.z,
+          particles->at(i).position.x, particles->at(i).position.y,
+          particles->at(i).position.z);
+
     particles->at(i).apply_force(field_to_force(field, particles->at(i)),
                                  sim_box_length);
+
+    if (std::isnan(particles->at(i).position.x))
+      CkPrintf(
+          "[iter=%d] After apply force: OOB(%d, %d, %d): pos=%lf, %lf, %lf\n",
+          iter, thisIndex.x, thisIndex.y, thisIndex.z,
+          particles->at(i).position.x, particles->at(i).position.y,
+          particles->at(i).position.z);
   }
 
   my_particles->cell_done();

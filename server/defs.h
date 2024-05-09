@@ -6,12 +6,13 @@
 #define UNIT_CHARGE 1.6e-19
 #define UNIT_MASS 1.0
 
-#define MAX_VELOCITY 0.01
+#define MAX_VELOCITY 0.1
 
 #define NBRS 8
 #define CORNERS 4
 #define NUM_GHOSTS 4
 
+#include "charm++.h"
 #include "pup.h"
 #include <cmath>
 #include <cinttypes>
@@ -19,8 +20,8 @@
 //#define SIM_BOX_LENGTH 50.0
 //#define MAX_ITER 1000
 
-#define SUMMARY_FREQ 100
-#define LB_FREQ 10
+#define SUMMARY_FREQ 1000
+#define LB_FREQ 171
 
 #define MODZ(x, a) (x + a) % a // modulo with negative wrap around
 #define SAFEMOD(x, a) a ? x % a : x
@@ -28,6 +29,10 @@
 
 #define EPSILON_FREE 8.85418782e-12
 #define MU_FREE 1.25663706e-6
+
+#define apply_periodicity(disp_, width_)                                       \
+  disp_ = (std::abs(disp_) == width_ - 1) ? ((disp_ > 0) ? -1 : 1) : disp_
+#define IDX3_HASH(x_, y_, z_) 3 * 3 * (x_ + 1) + 3 * (y_ + 1) + (z_ + 1)
 
 #define GHOST_IDX(_NBR, _GHOST) _NBR*NUM_GHOSTS+_GHOST
 
@@ -166,14 +171,42 @@ struct Particle {
   }
 
   void apply_force(const vec3 &force, const uint32_t sim_box_length) {
+    if (std::isnan(force.x))
+      CkPrintf("Force.x is NaN!\n");
+
+    if (std::isnan(force.y))
+      CkPrintf("Force.y is NaN!\n");
+
     acceleration = force / mass;
+
+    if (std::isnan(acceleration.x))
+      CkPrintf("acceleration.x is NaN!, mass=%E, charge=%E\n", mass, charge);
+
+    if (std::isnan(acceleration.y))
+      CkPrintf("acceleration.y is NaN!, mass=%E, charge=%E\n", mass, charge);
+
 
     velocity += acceleration * DT;
     limit_velocity();
 
+    /* if (std::isnan(velocity.x)) */
+    /*   CkPrintf("velocity.x is NaN!\n"); */
+
+    /* if (std::isnan(velocity.y)) */
+    /*   CkPrintf("velocity.y is NaN!\n"); */
+
+
     // assuming periodic boundaries
     position.x = wrap_around(position.x + velocity.x*DT, sim_box_length);
     position.y = wrap_around(position.y + velocity.y*DT, sim_box_length);
+    //position.z = wrap_around(position.z + velocity.z*DT, sim_box_length);
+    /* if (std::isnan(position.x)) */
+    /*   CkPrintf("position.x is NaN!\n"); */
+
+    /* if (std::isnan(position.y)) */
+    /*   CkPrintf("position.y is NaN!\n"); */
+
+
   }
 
   double wrap_around(double t, float w) {
@@ -197,9 +230,9 @@ struct Particle {
   }
 
   void limit_velocity() {
-    check_velocity(velocity.x);
-    check_velocity(velocity.y);
-    check_velocity(velocity.z);
+    velocity.x = check_velocity(velocity.x);
+    velocity.y = check_velocity(velocity.y);
+    velocity.z = check_velocity(velocity.z);
   }
 };
 
