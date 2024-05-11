@@ -6,7 +6,7 @@ mainmodule server
   mainchare Main
   {
     entry Main(CkArgMsg *);
-    entry void run_pic(PicParams pp, uint32_t box_count, uint32_t sim_box_length);
+    entry void run_pic(PicParams params);
     entry[reductiontarget] void updateMax(int);
     entry[reductiontarget] void updateTotal(int);
     entry void print_summary();
@@ -19,27 +19,26 @@ mainmodule server
 
   array[3D] Particles {
     entry Particles();
-    entry Particles(PicParams pp, uint32_t box_count, uint32_t sim_box_length_);
-    // entry void set_cell_proxy(const CProxy_Cell& cell_array_);
+    entry Particles(PicParams pp);
     //  Step 3a: (x, v) -> (rho, J)
-    entry void deposit_properties();
+    entry void deposit_properties(); // 3D
 
-    entry void set_cell_proxy(const CProxy_Cell &cell_array_);
+    entry void set_cell_proxy(const CProxy_Cell &cell_array_); // 3D
     // Step 3b: Reduction and sync corners between neighbours
-    entry void broadcast_ghosts();
+    entry void broadcast_ghosts(); // 3D
     entry void receive_ghost(int iter, int direction, int size,
-                              double data[size]);
-    entry void process_ghost(int direction, int size, double data[size]);
-    entry void reduce_ghosts();
+                              double data[size]); // 3D
+    entry void process_ghost(int direction, int size, double data[size]); // 3D
+    entry void reduce_ghosts(); // 3D
 
-    entry void cell_done();
-    entry void receive_particles_from_neighbour(ParticleDataMsg * msg);
+    entry void cell_done(); // 3D
+    entry void receive_particles_from_neighbour(ParticleDataMsg * msg); // 3D
 
-    entry void append_particles(ParticleDataMsg * msg);
+    entry void append_particles(ParticleDataMsg * msg); // 3D
 
-    entry void send_displaced();
-    entry void check_and_contribute();
-    entry void ResumeFromSync();
+    entry void send_displaced(); // 3D
+    entry void check_and_contribute(); // 3D
+    entry void ResumeFromSync(); // 3D
 
     // Orchestrating loop
     entry void run() {
@@ -49,7 +48,7 @@ mainmodule server
             broadcast_ghosts();
           }
 
-          for (imsg = 0; imsg < CORNERS - 1; imsg++) {
+          for (imsg = 0; imsg < corners - 1; imsg++) {
             when receive_ghost[iter](int iter, int direction, int size,
                                     double data[size]) serial {
                 process_ghost(direction, size, data);
@@ -69,7 +68,7 @@ mainmodule server
           }
 
           // receive particles that moved into my cell
-          for (imsg = 0; imsg < NBRS; imsg++) {
+          for (imsg = 0; imsg < inbrs; imsg++) {
             when receive_particles_from_neighbour(ParticleDataMsg *msg) serial {
                 append_particles(msg);
             }
@@ -88,7 +87,7 @@ mainmodule server
   };
 
   array[3D] Cell {
-    entry Cell(PicParams pp, uint32_t box_count, uint32_t sim_box_length);
+    entry Cell(PicParams pp);
 
     // entry void set_particles_proxy(const CProxy_Particles&
     // particles_array_);
@@ -98,14 +97,16 @@ mainmodule server
     // (E, B) -> Force -> Particle Movement
     //   Step 1: EMF Interpolation
     //   Step 2a: Particle Advance
-    entry void process_particles();
+    entry void process_particles(); // 3D
 
     entry void broadcast_corner();
 
     // exchanges for finite difference calculation
     entry void share_fields();
-    entry void recv_vec3(int iter, int direction, int count, double data[3*count]);
-    entry void update_field_ghosts(int direction, int count, double data[3*count]);
+    entry void recv_vec3(int iter, int direction, int count,
+                         double data[3 * count]); // 3D
+    entry void update_field_ghosts(int direction, int count,
+                                   double data[3 * count]);
 
     // Step 4a: EMF Advance (J) -> (E, B)
     entry void solve_fields();
@@ -113,11 +114,11 @@ mainmodule server
     // Step 3b: Synchronise reduced charge density of primary corner with
     // other corners
     entry void recv_properties(int iter, int direction, int size,
-                                double data[size]);
+                                double data[size]); // 3D
     entry void update_properties(int direction, int size, double data[size]);
 
-    entry void set_particles_proxy(CProxy_Particles particles_array_);
-    entry void ResumeFromSync();
+    entry void set_particles_proxy(CProxy_Particles particles_array_); // 3D
+    entry void ResumeFromSync(); // 3D
 
     // Orchestrating loop
     entry void run() {
@@ -128,7 +129,7 @@ mainmodule server
             serial { broadcast_corner(); }
 
             // update reduced charge densities
-            for (imsg = 0; imsg < CORNERS - 1; imsg++) {
+            for (imsg = 0; imsg < corners - 1; imsg++) {
                 when recv_properties[iter](int iter, int direction, int size, double data[size])
                     serial { update_properties(direction, size, data); }
             }
@@ -137,7 +138,7 @@ mainmodule server
             serial { share_fields(); }
 
             // store fields required for finding differences
-            for (imsg = 0; imsg < CORNERS; imsg++) {
+            for (imsg = 0; imsg < corners; imsg++) {
               when recv_vec3[iter](int iter, int direction, int count,
                                    double data[3*count])
                 serial { update_field_ghosts(direction, count, data); }

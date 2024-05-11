@@ -8,8 +8,8 @@ from charmpic.pic import CCSInterface, Species, Simulation
 
 interface = CCSInterface(sys.argv[1], 1234)
 
-electron = Species(name="electron", init_count=100000,
-                   mass=1, charge=1000, position_init="linear", pos_dist_params=[1, 2])
+electron = Species(name="electron", init_count=1000,
+                   mass=1, charge=10000, position_init="linear", pos_dist_params=[1, 2])
 
 sim = Simulation(
     interface=interface,

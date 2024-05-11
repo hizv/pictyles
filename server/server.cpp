@@ -23,21 +23,21 @@ public:
     p | prints;
   }
 
-  void run_pic(PicParams pp, uint32_t box_count, uint32_t sim_box_length) {
-    max_iter = pp.max_iterations;
+  void run_pic(PicParams params) {
+    max_iter = params.max_iterations;
     CkPrintf("Running CharmPIC on %d processors with %d chares\n", CkNumPes(),
-             box_count * box_count);
+             params.box_count * params.box_count);
 
     // Create array of particles.
-    CkArrayOptions opts(box_count, box_count, 1);
+    CkArrayOptions opts(params.box_count, params.box_count, 1);
 
     CProxy_Particles particles_array =
-        CProxy_Particles::ckNew(pp, box_count, sim_box_length, opts);
+        CProxy_Particles::ckNew(params, opts);
 
     // Create array of grids.
     opts.bindTo(particles_array);
     CProxy_Cell cell_array =
-        CProxy_Cell::ckNew(pp, box_count, sim_box_length, opts);
+        CProxy_Cell::ckNew(params, opts);
 
     particles_array.set_cell_proxy(cell_array);
     cell_array.set_particles_proxy(particles_array);

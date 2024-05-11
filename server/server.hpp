@@ -90,7 +90,7 @@ public:
   static void create_pic(uint32_t ndims, uint32_t *dims, PicParams pp) {
     uint32_t num_chare_x, num_chare_y, num_chare_z;
 
-    uint32_t sim_box_length = dims[0];
+    pp.sim_box_length = dims[0];
     num_chare_x = num_chare_y = num_chare_z = 1;
 
     uint32_t total_chares = pp.odf * CkNumPes();
@@ -107,6 +107,7 @@ public:
       num_chare_z = cbrt(total_chares); // std::min(odf, dims[1]);
     }
 
-    pic_proxy.run_pic(pp, num_chare_x, sim_box_length);
+    pp.box_count = num_chare_x;
+    pic_proxy.run_pic(pp);
   }
 };

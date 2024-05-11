@@ -3,14 +3,20 @@
 
 #define DT 0.014
 
-#define UNIT_CHARGE 1.6e-19
-#define UNIT_MASS 1.0
+#define CHARGE_ELECTRON 1.6e-19
+#define MASS_ELECTRON 9.109e-31
 
 #define MAX_VELOCITY 0.1
 
 #define NBRS 8
+#define NBRS_2D 8
+#define NBRS_3D 26
+
 #define CORNERS 4
-#define NUM_GHOSTS 4
+#define CORNERS_2D 4
+#define CORNERS_3D 8
+
+#define NUM_GHOSTS 4 // charge_density (1) + current_density (3)
 
 #include "charm++.h"
 #include "pup.h"
@@ -21,7 +27,7 @@
 //#define MAX_ITER 1000
 
 #define SUMMARY_FREQ 1000
-#define LB_FREQ 171
+#define LB_FREQ 2032
 
 #define MODZ(x, a) (x + a) % a // modulo with negative wrap around
 #define SAFEMOD(x, a) a ? x % a : x
@@ -137,33 +143,28 @@ PUPbytes(vec3)
 struct Particle {
   vec3 position, velocity, acceleration;
   float charge, mass;
+  uint8_t geometry;
 
   Particle(CkMigrateMessage *m) {}
 
-  virtual void pup(PUP::er &p) {
-    p | position;
-    p | velocity;
-    p | acceleration;
-    p | charge;
-    p | mass;
-  }
   Particle() {}
   virtual ~Particle(){};
 
-  Particle(double x, double y, double v_x, double v_y, float charge, float mass)
+  Particle(double x, double y, double z, double v_x, double v_y, double v_z, float charge, float mass)
       : charge(charge), mass(mass) {
     position.x = x;
     position.y = y;
-    position.z = 0.0;
+    position.z = z;
     velocity.x = v_x;
     velocity.y = v_y;
-    velocity.z = 0.0;
+    velocity.z = v_z;
   }
 
-  Particle(double x, double y, float charge, float mass)
-    : charge(charge), mass(mass) {
+  Particle(double x, double y, double z, float charge, float mass, uint8_t geometry)
+    : charge(charge), mass(mass), geometry(geometry) {
     position.x = x;
     position.y = y;
+    position.z = z;
     position.z = 0.0;
     velocity.x = 0.0;
     velocity.y = 0.0;
@@ -171,42 +172,16 @@ struct Particle {
   }
 
   void apply_force(const vec3 &force, const uint32_t sim_box_length) {
-    if (std::isnan(force.x))
-      CkPrintf("Force.x is NaN!\n");
-
-    if (std::isnan(force.y))
-      CkPrintf("Force.y is NaN!\n");
-
     acceleration = force / mass;
-
-    if (std::isnan(acceleration.x))
-      CkPrintf("acceleration.x is NaN!, mass=%E, charge=%E\n", mass, charge);
-
-    if (std::isnan(acceleration.y))
-      CkPrintf("acceleration.y is NaN!, mass=%E, charge=%E\n", mass, charge);
-
 
     velocity += acceleration * DT;
     limit_velocity();
 
-    /* if (std::isnan(velocity.x)) */
-    /*   CkPrintf("velocity.x is NaN!\n"); */
-
-    /* if (std::isnan(velocity.y)) */
-    /*   CkPrintf("velocity.y is NaN!\n"); */
-
-
     // assuming periodic boundaries
     position.x = wrap_around(position.x + velocity.x*DT, sim_box_length);
     position.y = wrap_around(position.y + velocity.y*DT, sim_box_length);
-    //position.z = wrap_around(position.z + velocity.z*DT, sim_box_length);
-    /* if (std::isnan(position.x)) */
-    /*   CkPrintf("position.x is NaN!\n"); */
-
-    /* if (std::isnan(position.y)) */
-    /*   CkPrintf("position.y is NaN!\n"); */
-
-
+    if (geometry == CART3D)
+      position.z = wrap_around(position.z + velocity.z*DT, sim_box_length);
   }
 
   double wrap_around(double t, float w) {
@@ -235,6 +210,7 @@ struct Particle {
     velocity.z = check_velocity(velocity.z);
   }
 };
+PUPbytes(Particle)
 
 /*********************************************************************************************
  Forcing Field associated with Cell
@@ -248,18 +224,16 @@ struct Field {
 
   Field(CkMigrateMessage *m) {}
 
-  virtual void pup(PUP::er &p) {
-    p | electric_field;
-    p | magnetic_field;
-  }
   Field() {}
   virtual ~Field(){};
 };
+PUPbytes(Field)
 
 struct PicParams {
   uint8_t pos_distribution, geometry;
   uint32_t odf, initial_particle_count, max_iterations;
   float mass, charge, time_delta, alpha, beta;
+  uint32_t sim_box_length, box_count;
   PicParams() {}
   PicParams(uint8_t pos_distribution_, uint8_t geometry_, uint32_t odf_,
             uint32_t initial_particle_count_, uint32_t max_iterations_,
@@ -272,3 +246,21 @@ struct PicParams {
   }
 };
 PUPbytes(PicParams)
+
+// calculate force using electric and magnetic fields
+inline vec3 field_to_force(const Field& field, const Particle& p) {
+  vec3 force;
+  force = field.electric_field * p.charge; // F_E = qE
+
+  // F_B = q (v cross B)
+  vec3 v = p.velocity;
+
+  vec3 cross_product = {
+      field.magnetic_field.y * v.z - field.magnetic_field.z * v.y,
+      field.magnetic_field.z * v.x - field.magnetic_field.x * v.z,
+      field.magnetic_field.x * v.y - field.magnetic_field.y * v.x};
+
+  force += cross_product * p.charge;
+
+  return force;
+}
