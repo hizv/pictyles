@@ -27,7 +27,7 @@
 //#define MAX_ITER 1000
 
 #define SUMMARY_FREQ 1000
-#define LB_FREQ 2032
+#define LB_FREQ 17
 
 #define MODZ(x, a) (x + a) % a // modulo with negative wrap around
 #define SAFEMOD(x, a) a ? x % a : x
@@ -233,14 +233,14 @@ struct PicParams {
   uint8_t pos_distribution, geometry;
   uint32_t odf, initial_particle_count, max_iterations;
   float mass, charge, time_delta, alpha, beta;
-  uint32_t sim_box_length, box_count;
+  uint32_t sim_box_length, box_count, lb_freq;
   PicParams() {}
   PicParams(uint8_t pos_distribution_, uint8_t geometry_, uint32_t odf_,
             uint32_t initial_particle_count_, uint32_t max_iterations_,
-            float time_delta_)
+            float time_delta_, uint32_t lb_freq_)
       : pos_distribution(pos_distribution_), geometry(geometry_), odf(odf_),
         initial_particle_count(initial_particle_count_),
-        max_iterations(max_iterations_), time_delta(time_delta_) {
+        max_iterations(max_iterations_), time_delta(time_delta_), lb_freq(lb_freq_) {
     alpha = 0.0;
     beta = 0.0;
   }

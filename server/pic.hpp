@@ -34,7 +34,7 @@ class Cell : public CBase_Cell {
 Cell_SDAG_CODE
 private:
   CProxy_Particles particles_array;
-  int iter, imsg, box_count, corners, inbrs;
+  int iter, imsg, box_count, corners, inbrs, lb_freq, context_size;
   PicParams params;
   uint32_t max_iter, sim_box_length;
   Field fields[CORNERS_3D];
@@ -47,11 +47,12 @@ public:
 
   Cell(PicParams pp)
       : iter(0), max_iter(pp.max_iterations), box_count(pp.box_count),
-        sim_box_length(pp.sim_box_length), params(pp) {
+        sim_box_length(pp.sim_box_length), params(pp), lb_freq(pp.lb_freq) {
     usesAtSync = true;
 
     corners = (pp.geometry == CART2D) ? CORNERS_2D : CORNERS_3D;
     inbrs = (pp.geometry == CART2D) ? NBRS_2D : NBRS_3D;
+    context_size = (pp.geometry == CART2D)? 4 : 6;
 
     charge_densities = new double[corners];
     current_densities = new vec3[corners];
@@ -79,6 +80,8 @@ public:
     p | params;
     p | corners;
     p | inbrs;
+    p | lb_freq;
+    p | context_size;
     PUP::PUParray<Field>(p, fields, corners);
 
     if (p.isPacking()) {
@@ -196,7 +199,7 @@ public:
         int off[6][3] = {{-1, 0, 0}, {0, -1, 0}, {0, 0, -1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
         int src_dir[6] = {RIGHT, BACK, UP, LEFT, FRONT, DOWN};
 
-        for (int ci = 0; ci < 4; ci++) {
+        for (int ci = 0; ci < 6; ci++) {
           thisProxy(MODZ(i + off[ci][0], box_count),
                     MODZ(j + off[ci][1], box_count),
                     MODZ(k + off[ci][2], box_count))
@@ -353,7 +356,7 @@ class Particles : public CBase_Particles {
 Particles_SDAG_CODE
 private:
   CProxy_Cell cell_array;
-  int iter, imsg, box_count, corners, inbrs;
+  int iter, imsg, box_count, corners, inbrs, lb_freq;
   uint8_t geometry;
   uint32_t max_iter;
   float box_width;
@@ -372,6 +375,7 @@ public:
     p | geometry;
     p | corners;
     p | inbrs;
+    p | lb_freq;
     PUP::PUParray<double>(p, ghost_data, 40 * NUM_GHOSTS);
     p | particles;
   }
@@ -381,7 +385,7 @@ public:
 
   Particles(PicParams pp)
       : iter(0), max_iter(pp.max_iterations), box_count(pp.box_count),
-        geometry(pp.geometry) {
+        geometry(pp.geometry), lb_freq(pp.lb_freq) {
     usesAtSync = true;
     std::random_device rd;
     std::mt19937 e2(rd());

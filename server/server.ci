@@ -51,7 +51,7 @@ mainmodule server
           for (imsg = 0; imsg < corners - 1; imsg++) {
             when receive_ghost[iter](int iter, int direction, int size,
                                     double data[size]) serial {
-                process_ghost(direction, size, data);
+              process_ghost(direction, size, data);
             }
           }
 
@@ -73,9 +73,8 @@ mainmodule server
                 append_particles(msg);
             }
           }
-
           // load balance every few iterations
-          if (iter % LB_FREQ == 0) {
+          if (iter % lb_freq == 0) {
             serial { AtSync(); }
             when ResumeFromSync() {}
           }
@@ -89,8 +88,6 @@ mainmodule server
   array[3D] Cell {
     entry Cell(PicParams pp);
 
-    // entry void set_particles_proxy(const CProxy_Particles&
-    // particles_array_);
     //  signal from particles to start
     entry void start();
 
@@ -131,17 +128,19 @@ mainmodule server
             // update reduced charge densities
             for (imsg = 0; imsg < corners - 1; imsg++) {
                 when recv_properties[iter](int iter, int direction, int size, double data[size])
-                    serial { update_properties(direction, size, data); }
+                    serial {
+                update_properties(direction, size, data); }
             }
 
             // exchange necessary fields for finding finite differences wrt space
             serial { share_fields(); }
 
             // store fields required for finding differences
-            for (imsg = 0; imsg < corners; imsg++) {
+            for (imsg = 0; imsg < context_size; imsg++) {
               when recv_vec3[iter](int iter, int direction, int count,
                                    double data[3*count])
-                serial { update_field_ghosts(direction, count, data); }
+                serial {
+              update_field_ghosts(direction, count, data); }
             }
 
           // Apply forces to my particles based on fields
@@ -152,7 +151,7 @@ mainmodule server
           }
 
           // load balance every few iterations
-          if (iter % LB_FREQ == 0) {
+          if (iter % lb_freq == 0) {
               serial { AtSync(); }
               when ResumeFromSync() {}
           }
