@@ -56,8 +56,8 @@
   vec3(_DATA[_OFFSET], _DATA[_OFFSET + 1], _DATA[_OFFSET + 2])
 
 #define unpack_vec3(_v) _v.x, _v.y, _v.z
-#define vec3_pair_to_list(_DATA, _TYPE, _i, _j)                                       \
-  { unpack_vec3(_DATA[_i]._TYPE), unpack_vec3(_DATA[_j]._TYPE) }
+#define vec3_pair(_DATA, _TYPE, _i, _j)                                       \
+  unpack_vec3(_DATA[_i]._TYPE), unpack_vec3(_DATA[_j]._TYPE)
 
 typedef std::pair<int, int> ipair;
 

@@ -25,11 +25,12 @@ public:
 
   void run_pic(PicParams params) {
     max_iter = params.max_iterations;
+    int box_count_z = (params.geometry == CART2D) ? 1 : params.box_count;
     CkPrintf("Running CharmPIC on %d processors with %d chares\n", CkNumPes(),
-             params.box_count * params.box_count);
+             params.box_count * params.box_count * box_count_z);
 
     // Create array of particles.
-    CkArrayOptions opts(params.box_count, params.box_count, 1);
+    CkArrayOptions opts(params.box_count, params.box_count, box_count_z);
 
     CProxy_Particles particles_array =
         CProxy_Particles::ckNew(params, opts);

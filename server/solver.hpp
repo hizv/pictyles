@@ -7,7 +7,7 @@ struct Solver {
 };
 
 struct Solver_Maxwell_Cart2D : public Solver {
-  float dt_ov_dx, dt_ov_dy, dt_ov_dz, dt;
+  float dt_ov_dx, dt_ov_dy, dt;
 
   Solver_Maxwell_Cart2D() {}
 
@@ -17,7 +17,6 @@ struct Solver_Maxwell_Cart2D : public Solver {
     dt = time_delta;
     dt_ov_dx = time_delta / box_width;
     dt_ov_dy = time_delta / box_width;
-    dt_ov_dz = time_delta / box_width;
   }
 
   Field poisson(float charge_density) {
@@ -66,23 +65,26 @@ struct Solver_Maxwell_Cart3D : public Solver {
     return Field(e_field, b_field);
   }
 
-  void field_solver(Field *field, const vec3* context) {
-      vec3 B_cur = field->magnetic_field;
-      vec3 E_cur = field->electric_field;
+  void field_solver(Field *field, const vec3 *context) {
+    vec3 B_cur = field->magnetic_field;
+    vec3 E_cur = field->electric_field;
 
-      vec3 J = context[0], B_inext = context[1], B_jnext = context[2],
-           E_iprev = context[3], E_jprev = context[4];
-      field->electric_field.x += -dt * J.x + dt_ov_dy * (B_jnext.z - B_cur.z);
-      field->electric_field.y +=
-          -dt * J.y - dt_ov_dx * (B_inext.z - B_cur.z);
-      field->electric_field.z += -dt * J.z +
-                                     dt_ov_dx * (B_inext.y - B_cur.y) -
-                                     dt_ov_dy * (B_jnext.x - B_cur.x);
+    vec3 J = context[0],
+      B_inext = context[1], B_jnext = context[2], B_knext = context[3],
+      E_iprev = context[4], E_jprev = context[5], E_kprev = context[6];
+    field->electric_field.x += -dt * J.x + dt_ov_dy * (B_jnext.z - B_cur.z) -
+                               dt_ov_dz * (B_knext.y - B_cur.y);
+    field->electric_field.y += -dt * J.y - dt_ov_dx * (B_inext.z - B_cur.z) +
+                               dt_ov_dz * (B_knext.x - B_cur.x);
+    field->electric_field.z += -dt * J.z + dt_ov_dx * (B_inext.y - B_cur.y) -
+                               dt_ov_dy * (B_jnext.x - B_cur.x);
 
-      field->magnetic_field.x -= dt_ov_dy * (E_cur.z - E_jprev.z);
-      field->magnetic_field.y += dt_ov_dx * (E_cur.z - E_iprev.z);
-      field->magnetic_field.z +=
-          dt_ov_dy * (E_cur.x - E_jprev.x) - dt_ov_dx * (E_cur.y - E_iprev.y);
+    field->magnetic_field.x +=
+        -dt_ov_dy * (E_cur.z - E_jprev.z) + dt_ov_dz * (E_cur.y - E_kprev.y);
+    field->magnetic_field.y +=
+        dt_ov_dx * (E_cur.z - E_iprev.z) - dt_ov_dz * (E_cur.x - E_kprev.x);
+    field->magnetic_field.z +=
+        dt_ov_dy * (E_cur.x - E_jprev.x) - dt_ov_dx * (E_cur.y - E_iprev.y);
   }
 };
 

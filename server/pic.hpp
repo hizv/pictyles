@@ -37,8 +37,8 @@ private:
   int iter, imsg, box_count, corners, inbrs;
   PicParams params;
   uint32_t max_iter, sim_box_length;
-  Field fields[CORNERS_2D];
-  vec3 *B_inext, *B_jnext, *E_iprev, *E_jprev;
+  Field fields[CORNERS_3D];
+  vec3 *B_inext, *B_jnext, *B_knext, *E_iprev, *E_jprev, *E_kprev;
 
 public:
   double *charge_densities;
@@ -58,8 +58,11 @@ public:
 
     B_inext = new vec3[corners];
     B_jnext = new vec3[corners];
+    B_knext = new vec3[corners];
     E_iprev = new vec3[corners];
     E_jprev = new vec3[corners];
+    E_kprev = new vec3[corners];
+
   }
 
   void set_particles_proxy(CProxy_Particles particles_array_) {
@@ -83,16 +86,20 @@ public:
       delete current_densities;
       delete B_inext;
       delete B_jnext;
+      delete B_knext;
       delete E_iprev;
       delete E_jprev;
+      delete E_kprev;
     }
     if (p.isUnpacking()) {
       charge_densities = new double[corners];
       current_densities = new vec3[corners];
       B_inext = new vec3[corners];
       B_jnext = new vec3[corners];
+      B_knext = new vec3[corners];
       E_iprev = new vec3[corners];
       E_jprev = new vec3[corners];
+      E_kprev = new vec3[corners];
     }
   }
 
@@ -106,65 +113,97 @@ public:
     data[2] = current_densities[1].y;
     data[3] = current_densities[1].z;
 
-    thisProxy(MODZ(thisIndex.x - 1, box_count), thisIndex.y, thisIndex.z)
-        .recv_properties(iter, RIGHT, NUM_GHOSTS, data);
-    thisProxy(thisIndex.x, MODZ(thisIndex.y + 1, box_count), thisIndex.z)
-        .recv_properties(iter, DOWN, NUM_GHOSTS, data);
-    thisProxy(MODZ(thisIndex.x - 1, box_count),
-              MODZ(thisIndex.y + 1, box_count), thisIndex.z)
-        .recv_properties(iter, DOWN|RIGHT, NUM_GHOSTS, data);
+    int i = thisIndex.x, j = thisIndex.y, k = thisIndex.z;
+    switch (params.geometry) {
+      case CART2D: {
+        int dest_offset[3][3] = {{-1, 0, 0}, {0, 1, 0}, {-1, 1, 0}};
+        int dir_src[3] = {RIGHT, DOWN, DOWN|RIGHT};
+        for (int ci = 0; ci < corners - 1; ci++) {
+          thisProxy(MODZ(i + dest_offset[ci][0], box_count),
+                    MODZ(j + dest_offset[ci][1], box_count),
+                    MODZ(k + dest_offset[ci][2], box_count))
+            .recv_properties(iter, dir_src[ci], NUM_GHOSTS, data);
+        }
+      } break;
+
+      case CART3D: {
+        int dest_offset[7][3] = {{0, 0, 1}, {0, -1, 1}, {0, -1, 0}, {-1, 0, 1},
+                                {-1, 0, 0},  {-1, -1, 1}, {-1, -1, 0}};
+        int dir_src[7] = {DOWN, BACK|DOWN, BACK, RIGHT|DOWN, RIGHT, RIGHT| BACK | DOWN, RIGHT | BACK};
+        for (int ci = 0; ci < corners - 1; ci++) {
+          thisProxy(MODZ(i + dest_offset[ci][0], box_count),
+                    MODZ(j + dest_offset[ci][1], box_count),
+                    MODZ(k + dest_offset[ci][2], box_count))
+            .recv_properties(iter, dir_src[ci], NUM_GHOSTS, data);
+        }
+      } break;
+    }
   }
 
   void update_properties(int direction, int size, double *data) {
     switch (size) {
     case 4: {
       vec3 curr_density = vec3(data[1], data[2], data[3]);
-
-      // CkPrintf("update_properties[%d, (%d, %d, %d)]: J = %E, %E, %E\n", iter,
-      // thisIndex.x, thisIndex.y, thisIndex.z, data[1], data[2], data[3]);
-      switch (direction) {
-      case DOWN:
-        current_densities[0] = curr_density;
-        break;
-      case RIGHT:
-        current_densities[3] = curr_density;
-        break;
-      case DOWN|RIGHT:
-        current_densities[2] = curr_density;
-        break;
-      default:
-        CkPrintf("impossible!\n");
+      switch (params.geometry) {
+          case CART2D: {
+            int corner_idx[DOWN|RIGHT + 1];
+            corner_idx[DOWN] = 0; corner_idx[RIGHT] = 3; corner_idx[DOWN|RIGHT] = 2;
+            current_densities[corner_idx[direction]] = curr_density;
+            charge_densities[corner_idx[direction]] = data[0];
+          } break;
+          case CART3D: {
+            int cidx[RIGHT|BACK|DOWN + 1];
+            cidx[DOWN] = 0; cidx[BACK|DOWN] = 2; cidx[BACK] = 3;
+            cidx[RIGHT|DOWN] = 4; cidx[RIGHT] = 5;
+            cidx[RIGHT|BACK|DOWN] = 6; cidx[RIGHT|BACK] = 7;
+            current_densities[cidx[direction]] = curr_density;
+            charge_densities[cidx[direction]] = data[0];
+          } break;
+        }
       }
-    }
-    case 1:
-      switch (direction) {
-      case DOWN:
-        charge_densities[0] = data[0];
-        break;
-      case RIGHT:
-        charge_densities[3] = data[0];
-        break;
-      case DOWN|RIGHT:
-        charge_densities[2] = data[0];
-        break;
-      default:
-        CkPrintf("impossible!\n");
-      }
-      break;
     }
   }
 
   void share_fields() {
-    double B_inext[6] = vec3_pair_to_list(fields, magnetic_field, 2, 3);
-    double B_jnext[6] = vec3_pair_to_list(fields, magnetic_field, 1, 3);
-    double E_iprev[6] = vec3_pair_to_list(fields, electric_field, 0, 1);
-    double E_jprev[6] = vec3_pair_to_list(fields, electric_field, 0, 2);
-
     int i = thisIndex.x, j = thisIndex.y, k = thisIndex.z;
-    thisProxy(MODZ(i - 1, box_count), j, k).recv_vec3(iter, RIGHT, 2, B_inext);
-    thisProxy(i, MODZ(j - 1, box_count), k).recv_vec3(iter, UP, 2, B_jnext);
-    thisProxy(MODZ(i + 1, box_count), j, k).recv_vec3(iter, LEFT, 2, E_iprev);
-    thisProxy(i, MODZ(j + 1, box_count), k).recv_vec3(iter, DOWN, 2, E_jprev);
+    switch (params.geometry) {
+      case CART2D: {
+        double context_fields[4][6] = {
+          {vec3_pair(fields, magnetic_field, 2, 3)}, // B_inext
+          {vec3_pair(fields, magnetic_field, 1, 3)}, // B_jnext
+          {vec3_pair(fields, electric_field, 0, 1)}, // E_iprev
+          {vec3_pair(fields, electric_field, 0, 2)} // E_jprev
+        };
+        int off[4][3] = {{-1, 0, 0}, {0, -1, 0}, {1, 0, 0}, {0, 1, 0}};
+        int src_dir[4] = {RIGHT, UP, LEFT, DOWN};
+        for (int ci = 0; ci < 4; ci++) {
+          thisProxy(MODZ(i + off[ci][0], box_count),
+                    MODZ(j + off[ci][1], box_count),
+                    MODZ(k + off[ci][2], box_count))
+            .recv_vec3(iter, src_dir[ci], 2, context_fields[ci]);
+        }
+      } break;
+      case CART3D: {
+        double context_fields[6][12] = {
+          {vec3_pair(fields, magnetic_field, 4, 6), vec3_pair(fields, magnetic_field, 5, 7)}, // B_inext
+          {vec3_pair(fields, magnetic_field, 2, 6), vec3_pair(fields, magnetic_field, 3, 7)}, // B_jnext
+          {vec3_pair(fields, magnetic_field, 1, 3), vec3_pair(fields, magnetic_field, 5, 7)}, // B_knext
+          {vec3_pair(fields, electric_field, 0, 2), vec3_pair(fields, electric_field, 1, 3)}, // E_iprev
+          {vec3_pair(fields, electric_field, 0, 4), vec3_pair(fields, electric_field, 1, 5)}, // E_jprev
+          {vec3_pair(fields, electric_field, 0, 2), vec3_pair(fields, electric_field, 4, 6)} // E_kprev
+        };
+
+        int off[6][3] = {{-1, 0, 0}, {0, -1, 0}, {0, 0, -1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+        int src_dir[6] = {RIGHT, BACK, UP, LEFT, FRONT, DOWN};
+
+        for (int ci = 0; ci < 4; ci++) {
+          thisProxy(MODZ(i + off[ci][0], box_count),
+                    MODZ(j + off[ci][1], box_count),
+                    MODZ(k + off[ci][2], box_count))
+            .recv_vec3(iter, src_dir[ci], 4, context_fields[ci]);
+        }
+      } break;
+    }
   }
 
   void update_field_ghosts(int direction, int count, double *data) {
@@ -190,6 +229,49 @@ public:
         CkPrintf("<Cell> Error: Unexpected field ghost direction");
       }
     }
+
+    else if (count == 4) {
+      switch (direction) {
+        case LEFT:
+          E_iprev[0] = pack_vec3(data, 0);
+          E_iprev[2] = pack_vec3(data, 1);
+          E_iprev[1] = pack_vec3(data, 2);
+          E_iprev[3] = pack_vec3(data, 3);
+          break;
+        case RIGHT:
+          B_inext[4] = pack_vec3(data, 0);
+          B_inext[6] = pack_vec3(data, 1);
+          B_inext[5] = pack_vec3(data, 2);
+          B_inext[7] = pack_vec3(data, 3);
+          break;
+        case BACK:
+          B_jnext[2] = pack_vec3(data, 0);
+          B_jnext[6] = pack_vec3(data, 1);
+          B_jnext[3] = pack_vec3(data, 2);
+          B_jnext[7] = pack_vec3(data, 3);
+          break;
+        case FRONT:
+          E_jprev[0] = pack_vec3(data, 0);
+          E_jprev[4] = pack_vec3(data, 1);
+          E_jprev[1] = pack_vec3(data, 2);
+          E_jprev[5] = pack_vec3(data, 3);
+          break;
+        case UP:
+          B_knext[1] = pack_vec3(data, 0);
+          B_knext[3] = pack_vec3(data, 1);
+          B_knext[5] = pack_vec3(data, 2);
+          B_knext[7] = pack_vec3(data, 3);
+          break;
+        case DOWN:
+          E_kprev[0] = pack_vec3(data, 0);
+          E_kprev[2] = pack_vec3(data, 1);
+          E_kprev[4] = pack_vec3(data, 2);
+          E_kprev[6] = pack_vec3(data, 3);
+          break;
+        default:
+          CkPrintf("<Cell> Error: Unexpected field ghost direction");
+      }
+    }
   }
 
   void solve_fields() {
@@ -201,24 +283,63 @@ public:
       }
     } else {
       // add fields inside cell to buffer for completion
-      B_inext[0] = fields[2].magnetic_field;
-      B_inext[1] = fields[3].magnetic_field;
+      switch (params.geometry) {
+        case CART2D: {
+          B_inext[0] = fields[2].magnetic_field;
+          B_inext[1] = fields[3].magnetic_field;
 
-      B_jnext[0] = fields[1].magnetic_field;
-      B_jnext[2] = fields[3].magnetic_field;
+          B_jnext[0] = fields[1].magnetic_field;
+          B_jnext[2] = fields[3].magnetic_field;
 
-      E_iprev[2] = fields[0].electric_field;
-      E_iprev[3] = fields[1].electric_field;
+          E_iprev[2] = fields[0].electric_field;
+          E_iprev[3] = fields[1].electric_field;
 
-      E_jprev[1] = fields[0].electric_field;
-      E_jprev[3] = fields[2].electric_field;
+          E_jprev[1] = fields[0].electric_field;
+          E_jprev[3] = fields[2].electric_field;
 
-      for (int i = 0; i < corners; i++) {
-        // CkPrintf("[%d] J = %E, %E, %E\n", iter, current_densities[i].x,
-        // current_densities[i].y, current_densities[i].z);
-        const vec3 context[5] = {current_densities[i], B_inext[i], B_jnext[i],
-                                 E_iprev[i], E_jprev[i]};
-        solver->field_solver(&fields[i], context);
+          for (int i = 0; i < corners; i++) {
+              const vec3 context[5] = {current_densities[i], B_inext[i], B_jnext[i],
+                                  E_iprev[i], E_jprev[i]};
+              solver->field_solver(&fields[i], context);
+          }
+        } break;
+        case CART3D: {
+          B_inext[0] = fields[4].magnetic_field;
+          B_inext[1] = fields[5].magnetic_field;
+          B_inext[2] = fields[6].magnetic_field;
+          B_inext[3] = fields[7].magnetic_field;
+
+          B_jnext[0] = fields[2].magnetic_field;
+          B_jnext[1] = fields[3].magnetic_field;
+          B_jnext[4] = fields[6].magnetic_field;
+          B_jnext[5] = fields[7].magnetic_field;
+
+          B_knext[0] = fields[1].magnetic_field;
+          B_knext[2] = fields[3].magnetic_field;
+          B_knext[4] = fields[5].magnetic_field;
+          B_knext[6] = fields[7].magnetic_field;
+
+          E_iprev[4] = fields[0].electric_field;
+          E_iprev[5] = fields[1].electric_field;
+          E_iprev[6] = fields[2].electric_field;
+          E_iprev[7] = fields[3].electric_field;
+
+          E_jprev[2] = fields[0].electric_field;
+          E_jprev[3] = fields[1].electric_field;
+          E_jprev[6] = fields[4].electric_field;
+          E_jprev[7] = fields[5].electric_field;
+
+          E_kprev[1] = fields[0].electric_field;
+          E_kprev[3] = fields[2].electric_field;
+          E_kprev[5] = fields[4].electric_field;
+          E_kprev[7] = fields[6].electric_field;
+
+          for (int i = 0; i < corners; i++) {
+            const vec3 context[7] = {current_densities[i], B_inext[i], B_jnext[i], B_knext[i],
+                                E_iprev[i], E_jprev[i], E_kprev[i]};
+            solver->field_solver(&fields[i], context);
+          }
+        } break;
       }
     }
     delete solver;
@@ -236,7 +357,7 @@ private:
   uint8_t geometry;
   uint32_t max_iter;
   float box_width;
-  double ghost_data[NBRS * NUM_GHOSTS];
+  double ghost_data[40 * NUM_GHOSTS];
 
 public:
   std::vector<Particle> particles;
@@ -251,7 +372,7 @@ public:
     p | geometry;
     p | corners;
     p | inbrs;
-    PUP::PUParray<double>(p, ghost_data, inbrs * NUM_GHOSTS);
+    PUP::PUParray<double>(p, ghost_data, 40 * NUM_GHOSTS);
     p | particles;
   }
 
@@ -443,7 +564,10 @@ public:
           std::fmod(particles[i].position.y, box_width) < 1e-5) {
         dest_chare_y -= 1;
       }
-
+      if (dest_chare_z == box_count &&
+          std::fmod(particles[i].position.z, box_width) < 1e-5) {
+        dest_chare_z -= 1;
+      }
       if (dest_chare_x == thisIndex.x && dest_chare_y == thisIndex.y) {
         i++; // Stay in same chare
       } else {
@@ -495,7 +619,7 @@ public:
         msg->particles[pi] = bufs[ni][pi];
 
       thisProxy(MODZ(thisIndex.x + off_x, box_count),
-                MODZ(thisIndex.y + off_y, box_count), thisIndex.z + off_z)
+                MODZ(thisIndex.y + off_y, box_count), MODZ(thisIndex.z + off_z, box_count))
           .receive_particles_from_neighbour(msg);
     }
   }

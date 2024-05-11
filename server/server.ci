@@ -99,23 +99,23 @@ mainmodule server
     //   Step 2a: Particle Advance
     entry void process_particles(); // 3D
 
-    entry void broadcast_corner();
-
-    // exchanges for finite difference calculation
-    entry void share_fields();
-    entry void recv_vec3(int iter, int direction, int count,
-                         double data[3 * count]); // 3D
-    entry void update_field_ghosts(int direction, int count,
-                                   double data[3 * count]);
-
-    // Step 4a: EMF Advance (J) -> (E, B)
-    entry void solve_fields();
+    entry void broadcast_corner(); // 3D
 
     // Step 3b: Synchronise reduced charge density of primary corner with
     // other corners
     entry void recv_properties(int iter, int direction, int size,
                                 double data[size]); // 3D
-    entry void update_properties(int direction, int size, double data[size]);
+    entry void update_properties(int direction, int size, double data[size]); // 3D
+
+    // exchanges for finite difference calculation
+    entry void share_fields(); // 3D
+    entry void recv_vec3(int iter, int direction, int count,
+                         double data[3 * count]); // 3D
+    entry void update_field_ghosts(int direction, int count,
+                                   double data[3 * count]); // 3D
+
+    // Step 4a: EMF Advance (J) -> (E, B)
+    entry void solve_fields(); // 3D
 
     entry void set_particles_proxy(CProxy_Particles particles_array_); // 3D
     entry void ResumeFromSync(); // 3D
