@@ -33,7 +33,7 @@ public:
 
     for (int i = 0; i < sim_box_ndims; i++) {
       sim_box_dims[i] = extract<uint32_t>(cmd);
-      CkPrintf("<create_handler> sim_box_dims[%d] = %u\n", i, sim_box_dims[i]);
+      // CkPrintf("<create_handler> sim_box_dims[%d] = %u\n", i, sim_box_dims[i]);
     }
 
     // Simulation parameters
@@ -52,8 +52,8 @@ public:
     float mass = extract<float>(cmd);
     float charge = extract<float>(cmd);
 
-    CkPrintf("<create_handler> %u %u %f %u mass=%E\n", sim_box_ndims, odf, time_delta,
-             init_particle_count, mass);
+    // CkPrintf("<create_handler> %u %u %f %u mass=%E\n", sim_box_ndims, odf, time_delta,
+             // init_particle_count, mass);
 
     PicParams pp = PicParams(position_distribution, geometry, odf,
                              init_particle_count, iterations, time_delta, lb_freq);

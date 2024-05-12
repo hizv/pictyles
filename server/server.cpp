@@ -8,6 +8,7 @@ private:
   int reductions, prints;
   int max_particles, total_particles;
   uint32_t max_iter;
+  double walltime_start;
 
 public:
   Main(CkArgMsg *msg) : prints(0), reductions(0) {
@@ -21,6 +22,8 @@ public:
   void pup(PUP::er &p) {
     p | reductions;
     p | prints;
+    p | max_iter;
+    p | walltime_start;
   }
 
   void run_pic(PicParams params) {
@@ -42,6 +45,8 @@ public:
 
     particles_array.set_cell_proxy(cell_array);
     cell_array.set_particles_proxy(particles_array);
+
+    walltime_start = CkWallTimer();
     cell_array.run();
     particles_array.run();
   }
@@ -74,8 +79,10 @@ public:
     prints++;
     CkPrintf("[%d] Max Particles: %d, Total Particles: %d\n", prints,
              max_particles, total_particles);
-    if (prints == max_iter / SUMMARY_FREQ)
+    if (prints == max_iter / SUMMARY_FREQ) {
+      CkPrintf("Execution Time: %lf\n", CkWallTimer() - walltime_start);
       CkExit();
+    }
   }
 };
 
