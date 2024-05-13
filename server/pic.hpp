@@ -572,7 +572,7 @@ public:
           std::fmod(particles[i].position.z, box_width) < 1e-5) {
         dest_chare_z -= 1;
       }
-      if (dest_chare_x == thisIndex.x && dest_chare_y == thisIndex.y) {
+      if (dest_chare_x == thisIndex.x && dest_chare_y == thisIndex.y && dest_chare_z == thisIndex.z) {
         i++; // Stay in same chare
       } else {
         int disp_x = dest_chare_x - thisIndex.x,

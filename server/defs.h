@@ -165,7 +165,6 @@ struct Particle {
     position.x = x;
     position.y = y;
     position.z = z;
-    position.z = 0.0;
     velocity.x = 0.0;
     velocity.y = 0.0;
     velocity.z = 0.0;
