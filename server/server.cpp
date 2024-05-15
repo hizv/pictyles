@@ -19,19 +19,13 @@ public:
     pic_proxy = thisProxy; // for reductions
   }
 
-  void pup(PUP::er &p) {
-    p | reductions;
-    p | prints;
-    p | max_iter;
-    p | walltime_start;
-  }
-
   void run_pic(PicParams params) {
     max_iter = params.max_iterations;
     int box_count_z = (params.geometry == CART2D) ? 1 : params.box_count;
     CkPrintf("Running CharmPIC on %d processors with %d chares\n", CkNumPes(),
              params.box_count * params.box_count * box_count_z);
 
+    CkPrintf("Migrate Freq = %d\n", params.migrate_freq);
     // Create array of particles.
     CkArrayOptions opts(params.box_count, params.box_count, box_count_z);
 

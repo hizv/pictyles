@@ -356,7 +356,7 @@ class Particles : public CBase_Particles {
 Particles_SDAG_CODE
 private:
   CProxy_Cell cell_array;
-  int iter, imsg, box_count, corners, inbrs, lb_freq;
+  int iter, imsg, box_count, corners, inbrs, lb_freq, migrate_freq;
   uint8_t geometry;
   uint32_t max_iter;
   float box_width;
@@ -376,6 +376,7 @@ public:
     p | corners;
     p | inbrs;
     p | lb_freq;
+    p | migrate_freq;
     PUP::PUParray<double>(p, ghost_data, 40 * NUM_GHOSTS);
     p | particles;
   }
@@ -385,7 +386,7 @@ public:
 
   Particles(PicParams pp)
       : iter(0), max_iter(pp.max_iterations), box_count(pp.box_count),
-        geometry(pp.geometry), lb_freq(pp.lb_freq) {
+        geometry(pp.geometry), lb_freq(pp.lb_freq), migrate_freq(pp.migrate_freq) {
     usesAtSync = true;
     std::random_device rd;
     std::mt19937 e2(rd());

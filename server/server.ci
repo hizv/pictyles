@@ -63,14 +63,17 @@ mainmodule server
           }
 
           // resume when cell has advanced particles
-          when cell_done() serial {
-            send_displaced();
-          }
+          when cell_done()
+          if (iter % migrate_freq == 0) {
+              serial {
+              send_displaced();
+            }
 
-          // receive particles that moved into my cell
-          for (imsg = 0; imsg < inbrs; imsg++) {
-            when receive_particles_from_neighbour(ParticleDataMsg *msg) serial {
-                append_particles(msg);
+            // receive particles that moved into my cell
+            for (imsg = 0; imsg < inbrs; imsg++) {
+              when receive_particles_from_neighbour(ParticleDataMsg *msg) serial {
+                  append_particles(msg);
+              }
             }
           }
           // load balance every few iterations

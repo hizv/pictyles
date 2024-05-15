@@ -38,6 +38,7 @@ class Simulation(object):
         boundary_conditions: str = "periodic",
         geometry: str = "cartesian2D",
         lb_freq: int = 17,
+        migrate_freq: int = 1,
     ):
         # self.grid_shape = grid_shape
         self.odf = odf
@@ -54,6 +55,7 @@ class Simulation(object):
         self.species = species
         self.geometry = geometry
         self.lb_freq = lb_freq
+        self.migrate_freq = migrate_freq
 
     def run(self):
         """
@@ -79,6 +81,7 @@ class Simulation(object):
         cmd += to_bytes(BOUNDARY[self.boundary_conditions], "B")
         cmd += to_bytes(GEOMETRY[self.geometry], "B")
         cmd += to_bytes(self.lb_freq, "I")
+        cmd += to_bytes(self.migrate_freq, "I")
 
         cmd += to_bytes(self.species[0].init_count, "I")
         cmd += to_bytes(DISTRIBUTION[self.species[0].position_init], "B")

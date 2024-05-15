@@ -11,9 +11,9 @@ interface = CCSInterface(sys.argv[1], 1234)
 
 electron = Species(
     name="electron",
-    init_count=1000,
+    init_count=16000,
     mass=1,
-    charge=100,
+    charge=10,
     position_init="linear",
     pos_dist_params=[1, 2],
 )
@@ -21,12 +21,13 @@ electron = Species(
 sim = Simulation(
     interface=interface,
     odf=16,
-    sim_box_shape=[5, 5, 5],
+    sim_box_shape=[5, 5],
     iterations=4000,
     boundary_conditions="periodic",
     species=[electron],
-    geometry="cartesian3D",
-    lb_freq=23,
+    geometry="cartesian2D",
+    lb_freq=1200,
+    migrate_freq=1,
 )
 
 sim.run()

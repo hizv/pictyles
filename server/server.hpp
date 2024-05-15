@@ -43,6 +43,7 @@ public:
     uint8_t boundary_conditions = extract<uint8_t>(cmd);
     uint8_t geometry = extract<uint8_t>(cmd);
     uint32_t lb_freq = extract<uint32_t>(cmd);
+    uint32_t migrate_freq = extract<uint32_t>(cmd);
 
     // Species parameters
     uint32_t init_particle_count = extract<uint32_t>(cmd);
@@ -56,7 +57,7 @@ public:
              // init_particle_count, mass);
 
     PicParams pp = PicParams(position_distribution, geometry, odf,
-                             init_particle_count, iterations, time_delta, lb_freq);
+                             init_particle_count, iterations, time_delta, lb_freq, migrate_freq);
 
     pp.mass = mass; pp.charge = charge;
     pp.alpha = alpha; pp.beta = beta;
