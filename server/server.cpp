@@ -57,26 +57,26 @@ public:
     CcsRegisterHandler("pic_create", (CmiHandler)Server::create_handler);
   }
 
-  void updateMax(int new_max) {
-    max_particles = new_max;
-    if (++reductions == 2)
-      print_summary();
-  }
-  void updateTotal(int new_total) {
-    total_particles = new_total;
-    if (++reductions == 2)
-      print_summary();
-  }
+  // void updateMax(int new_max) {
+  //   max_particles = new_max;
+  //   if (++reductions == 2)
+  //     print_summary();
+  // }
+  // void updateTotal(int new_total) {
+  //   total_particles = new_total;
+  //   if (++reductions == 2)
+  //     print_summary();
+  // }
 
   void print_summary() {
-    reductions = 0;
-    prints++;
-    CkPrintf("[%d] Max Particles: %d, Total Particles: %d\n", prints,
-             max_particles, total_particles);
-    if (prints == max_iter / SUMMARY_FREQ) {
+    // reductions = 0;
+    // prints++;
+    // CkPrintf("[%d] Max Particles: %d, Total Particles: %d\n", prints,
+    //          max_particles, total_particles);
+    // if (prints == max_iter / SUMMARY_FREQ) {
       CkPrintf("Execution Time: %lf\n", CkWallTimer() - walltime_start);
       CkExit();
-    }
+    // }
   }
 };
 

@@ -637,16 +637,21 @@ public:
   }
 
   void check_and_contribute() {
-    if (iter % SUMMARY_FREQ == 0) {
-      int particle_count = particles.size();
-      CkCallback cb1 =
-          CkCallback(CkReductionTarget(Main, updateMax), pic_proxy);
-      CkCallback cb2 =
-          CkCallback(CkReductionTarget(Main, updateTotal), pic_proxy);
-
-      contribute(sizeof(int), &particle_count, CkReduction::max_int, cb1);
-      contribute(sizeof(int), &particle_count, CkReduction::sum_int, cb2);
+    if (iter == max_iter) {
+      CkCallback cb =
+          CkCallback(CkReductionTarget(Main, print_summary), pic_proxy);
+      contribute(cb);
     }
+    // if (iter % SUMMARY_FREQ == 0) {
+    //   int particle_count = particles.size();
+    //   CkCallback cb1 =
+    //       CkCallback(CkReductionTarget(Main, updateMax), pic_proxy);
+    //   CkCallback cb2 =
+    //       CkCallback(CkReductionTarget(Main, updateTotal), pic_proxy);
+
+    //   contribute(sizeof(int), &particle_count, CkReduction::max_int, cb1);
+    //   contribute(sizeof(int), &particle_count, CkReduction::sum_int, cb2);
+    // }
   }
 };
 

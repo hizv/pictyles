@@ -7,9 +7,9 @@ mainmodule server
   {
     entry Main(CkArgMsg *);
     entry void run_pic(PicParams params);
-    entry[reductiontarget] void updateMax(int);
-    entry[reductiontarget] void updateTotal(int);
-    entry void print_summary();
+    // entry[reductiontarget] void updateMax(int);
+    // entry[reductiontarget] void updateTotal(int);
+    entry[reductiontarget] void print_summary();
   };
 
   // message used to send particles
