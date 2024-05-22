@@ -27,7 +27,7 @@ sim = Simulation(
     species=[electron],
     geometry="cartesian2D",
     lb_freq=1200,
-    migrate_freq=1,
+    migrate_freq=16,
 )
 
 sim.run()

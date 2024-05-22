@@ -71,7 +71,7 @@ mainmodule server
 
             // receive particles that moved into my cell
             for (imsg = 0; imsg < inbrs; imsg++) {
-              when receive_particles_from_neighbour(ParticleDataMsg *msg) serial {
+              when receive_particles_from_neighbour[iter](ParticleDataMsg *msg) serial {
                   append_particles(msg);
               }
             }

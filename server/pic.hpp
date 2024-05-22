@@ -623,6 +623,7 @@ public:
       for (int pi = 0; pi < len; ++pi)
         msg->particles[pi] = bufs[ni][pi];
 
+      CkSetRefNum(msg, iter);
       thisProxy(MODZ(thisIndex.x + off_x, box_count),
                 MODZ(thisIndex.y + off_y, box_count), MODZ(thisIndex.z + off_z, box_count))
           .receive_particles_from_neighbour(msg);
