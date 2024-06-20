@@ -9,6 +9,8 @@ private:
   int max_particles, total_particles;
   uint32_t max_iter;
   double walltime_start;
+  CProxy_Particles particles_array;
+  CProxy_Cell cell_array;
 
 public:
   Main(CkArgMsg *msg) : prints(0), reductions(0) {
@@ -29,13 +31,11 @@ public:
     // Create array of particles.
     CkArrayOptions opts(params.box_count, params.box_count, box_count_z);
 
-    CProxy_Particles particles_array =
-        CProxy_Particles::ckNew(params, opts);
+    particles_array = CProxy_Particles::ckNew(params, opts);
 
     // Create array of grids.
     opts.bindTo(particles_array);
-    CProxy_Cell cell_array =
-        CProxy_Cell::ckNew(params, opts);
+    cell_array = CProxy_Cell::ckNew(params, opts);
 
     particles_array.set_cell_proxy(cell_array);
     cell_array.set_particles_proxy(particles_array);
@@ -77,6 +77,14 @@ public:
       CkPrintf("Execution Time: %lf\n", CkWallTimer() - walltime_start);
       CkExit();
     // }
+  }
+
+  void reduce_sync() {
+    if (++reductions == 2) {
+     particles_array.pic_synced();
+     cell_array.pic_synced();
+     reductions = 0;
+    }
   }
 };
 

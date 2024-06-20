@@ -70,6 +70,14 @@ public:
     particles_array = particles_array_;
   }
 
+  void check_and_contribute() {
+    CkCallback cb =
+        CkCallback(CkReductionTarget(Main, reduce_sync), pic_proxy);
+
+    contribute(cb);
+  }
+
+
   void pup(PUP::er &p) {
     p | iter;
     p | imsg;
@@ -641,6 +649,11 @@ public:
       CkCallback cb =
           CkCallback(CkReductionTarget(Main, print_summary), pic_proxy);
       contribute(cb);
+    }
+    else {
+    CkCallback cb =
+          CkCallback(CkReductionTarget(Main, reduce_sync), pic_proxy);
+    contribute(cb);
     }
     // if (iter % SUMMARY_FREQ == 0) {
     //   int particle_count = particles.size();
