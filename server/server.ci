@@ -46,19 +46,22 @@ mainmodule server
     // Orchestrating loop
     entry void run() {
       for (iter = 1; iter <= max_iter; iter++) {
-          serial {
+          serial "deposit_properties"{
             deposit_properties();
+          }
+          serial "broadcast_ghosts" {
             broadcast_ghosts();
           }
 
           for (imsg = 0; imsg < corners - 1; imsg++) {
             when receive_ghost[iter](int iter, int direction, int size,
-                                    double data[size]) serial {
+                                    double data[size])
+              serial "process_ghost"{
               process_ghost(direction, size, data);
             }
           }
 
-          serial {
+          serial "reduce_ghosts"{
             reduce_ghosts(); // reduce ghosts from all cells sharing a corner
 
             Cell *my_cell = cell_array[thisIndex].ckLocal();
@@ -68,25 +71,26 @@ mainmodule server
           // resume when cell has advanced particles
           when cell_done()
           if (iter % migrate_freq == 0) {
-              serial {
+              serial "send_displaced" {
               send_displaced();
             }
 
             // receive particles that moved into my cell
             for (imsg = 0; imsg < inbrs; imsg++) {
-              when receive_particles_from_neighbour[iter](ParticleDataMsg *msg) serial {
+              when receive_particles_from_neighbour[iter](ParticleDataMsg *msg)
+                serial "append_particles" {
                   append_particles(msg);
               }
             }
           }
           // load balance every few iterations
           if (iter % lb_freq == 0) {
-            serial { AtSync(); }
+            serial "migrate_particles" { AtSync(); }
             when ResumeFromSync() {}
           }
 
           // inform main chare of my status
-          serial { check_and_contribute(); }
+          serial "particles_reduce" { check_and_contribute(); }
           when pic_synced() {}
         }
       };
@@ -132,29 +136,34 @@ mainmodule server
           // get particle details from the particles
           when start() {
             // share reduced properties to cells which share that corner
-            serial { broadcast_corner(); }
+            serial "broadcast_corner" {
+              broadcast_corner();
+            }
 
             // update reduced charge densities
             for (imsg = 0; imsg < corners - 1; imsg++) {
                 when recv_properties[iter](int iter, int direction, int size, double data[size])
-                serial {
+                serial "update_properties" {
                   update_properties(direction, size, data);
               }
             }
 
             // exchange necessary fields for finding finite differences wrt space
-            serial { share_fields(); }
+            serial "share_fields" {
+              share_fields();
+            }
 
             // store fields required for finding differences
             for (imsg = 0; imsg < context_size; imsg++) {
               when recv_vec3[iter](int iter, int direction, int count,
                                    double data[3*count])
-                serial {
-              update_field_ghosts(direction, count, data); }
+              serial "update_field_ghosts" {
+                update_field_ghosts(direction, count, data);
+              }
             }
 
           // Apply forces to my particles based on fields
-            serial {
+            serial "apply_forces" {
                 solve_fields();
                 process_particles();
             }
@@ -162,12 +171,12 @@ mainmodule server
 
           // load balance every few iterations
           if (iter % lb_freq == 0) {
-              serial { AtSync(); }
+              serial "migrate_cell" { AtSync(); }
               when ResumeFromSync() {}
           }
 
           // inform main chare of my status
-          serial { check_and_contribute(); }
+          serial "cell_reduce" { check_and_contribute(); }
           when pic_synced() {}
       }
     };
