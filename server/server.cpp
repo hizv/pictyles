@@ -79,8 +79,17 @@ public:
     // }
   }
 
-  void reduce_sync() {
-    if (++reductions == 2) {
+  void sync_p() {
+    reductions += 2;
+    if (reductions == 3) {
+     particles_array.pic_synced();
+     cell_array.pic_synced();
+     reductions = 0;
+    }
+  }
+  void sync_c() {
+    reductions += 1;
+    if (reductions == 3) {
      particles_array.pic_synced();
      cell_array.pic_synced();
      reductions = 0;

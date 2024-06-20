@@ -10,7 +10,8 @@ mainmodule server
     // entry[reductiontarget] void updateMax(int);
     // entry[reductiontarget] void updateTotal(int);
     entry[reductiontarget] void print_summary();
-    entry[reductiontarget] void reduce_sync();
+    entry[reductiontarget] void sync_p();
+    entry[reductiontarget] void sync_c();
   };
 
   // message used to send particles

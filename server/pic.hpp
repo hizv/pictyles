@@ -72,7 +72,7 @@ public:
 
   void check_and_contribute() {
     CkCallback cb =
-        CkCallback(CkReductionTarget(Main, reduce_sync), pic_proxy);
+        CkCallback(CkReductionTarget(Main, sync_c), pic_proxy);
 
     contribute(cb);
   }
@@ -652,7 +652,7 @@ public:
     }
     else {
     CkCallback cb =
-          CkCallback(CkReductionTarget(Main, reduce_sync), pic_proxy);
+          CkCallback(CkReductionTarget(Main, sync_p), pic_proxy);
     contribute(cb);
     }
     // if (iter % SUMMARY_FREQ == 0) {
